@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"loanApp/app"
 	"loanApp/components/loanofficer/service"
 	"loanApp/components/middleware"
 	"loanApp/models/user"
@@ -42,7 +43,19 @@ func (c *LoanOfficerController) CreateLoanOfficer(w http.ResponseWriter, r *http
 		web.RespondWithError(w, http.StatusBadRequest, "Invalid input")
 		return
 	}
-
+	userID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("No such admin found: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
+		return
+	}
+	var admin *user.Admin
+	for _, a := range app.AllAdmins {
+		if a.ID == userID {
+			admin = a
+		}
+	}
+	newOfficer.CreatedBy = admin
 	newOfficer.Role = "Loan Officer"
 	if err := c.LoanOfficerService.CreateLoanOfficer(&newOfficer); err != nil {
 		c.log.Error("Error creating loan officer: ", err)
@@ -55,13 +68,19 @@ func (c *LoanOfficerController) CreateLoanOfficer(w http.ResponseWriter, r *http
 }
 
 func (c *LoanOfficerController) GetAllLoanOfficers(w http.ResponseWriter, r *http.Request) {
-	loanOfficers, err := c.LoanOfficerService.GetAllLoanOfficers()
-	if err != nil {
-		c.log.Error("Error fetching loan officers: ", err)
-		web.RespondWithError(w, http.StatusInternalServerError, "Could not fetch loan officers")
+	c.log.Info("GetAllLoanOfficers called")
+
+	parser := web.NewParser(r)
+	allLoanOfficers := []*user.LoanOfficer{}
+	var totalCount int
+
+	if err := c.LoanOfficerService.GetAllLoanOfficers(&allLoanOfficers, &totalCount, *parser); err != nil {
+		c.log.Error("Error fetching officers: ", err)
+		web.RespondWithError(w, http.StatusInternalServerError, "Could not fetch officers")
 		return
 	}
-	web.RespondWithJSON(w, http.StatusOK, loanOfficers)
+
+	web.RespondWithJSON(w, http.StatusOK, allLoanOfficers)
 }
 
 func (c *LoanOfficerController) UpdateLoanOfficer(w http.ResponseWriter, r *http.Request) {
@@ -73,6 +92,24 @@ func (c *LoanOfficerController) UpdateLoanOfficer(w http.ResponseWriter, r *http
 		c.log.Error("Invalid input: ", err)
 		web.RespondWithError(w, http.StatusBadRequest, "Invalid input")
 		return
+	}
+
+	userID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("No such admin found: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
+		return
+	}
+	var admin *user.Admin
+	for _, a := range app.AllAdmins {
+		if a.ID == userID {
+			admin = a
+		}
+	}
+	if len(updatedOfficer.UpdatedBy) == 0 {
+		updatedOfficer.UpdatedBy = []*user.Admin{admin}
+	} else {
+		updatedOfficer.UpdatedBy = append(updatedOfficer.UpdatedBy, admin)
 	}
 
 	if err := c.LoanOfficerService.UpdateLoanOfficer(officerID, &updatedOfficer); err != nil {

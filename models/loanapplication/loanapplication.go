@@ -11,7 +11,7 @@ import (
 type LoanApplication struct {
 	gorm.Model
 	LoanSchemeID    int                          `gorm:"not null"`
-	UserID          int                          `gorm:"not null"`
+	CustomerID      int                          `gorm:"not null"`
 	LoanOfficerID   int                          `gorm:"not null"`
 	ApplicationDate time.Time                    `gorm:"default:CURRENT_TIMESTAMP"`
 	DecisionDate    time.Time                    `gorm:"nullable"`

@@ -65,6 +65,7 @@ func (s *CustomerService) GetCustomerByID(customerID uint) (*user.Customer, erro
 
 	var customer user.Customer
 	if err := s.repository.GetByID(uow, &customer, customerID); err != nil {
+		s.repository.Preload("LoginInfo")
 		s.log.Error("Error fetching customer: ", err)
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"loanApp/components/admin/service"
+	"loanApp/components/middleware"
 	"loanApp/models/user"
 	"loanApp/utils/log"
 	"loanApp/utils/web"
@@ -27,6 +28,8 @@ func NewAdminController(AdminService *service.AdminService, log log.Logger) *Adm
 
 func (a *AdminController) RegisterRoutes(router *mux.Router) {
 	adminRouter := router.PathPrefix("/admin").Subrouter()
+	adminRouter.Use(middleware.TokenAuthMiddleware)
+	adminRouter.Use(middleware.AdminOnly) // Admin authorization middleware applied globally
 	adminRouter.HandleFunc("/", a.CreateAdmin).Methods(http.MethodPost)
 	adminRouter.HandleFunc("/", a.GetAllAdmins).Methods(http.MethodGet)
 }
@@ -64,7 +67,7 @@ func (a *AdminController) GetAllAdmins(w http.ResponseWriter, r *http.Request) {
 	allAdmins := []*user.Admin{}
 	var totalCount int
 
-	if err := a.AdminService.GetAllAdmins(allAdmins, &totalCount, *parser); err != nil {
+	if err := a.AdminService.GetAllAdmins(&allAdmins, &totalCount, *parser); err != nil {
 		a.log.Error("Error fetching admins: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not fetch admins")
 		return
@@ -84,6 +87,6 @@ func validateAdmin(admin user.Admin) error {
 	if admin.Password == "" {
 		return errors.New("password cannot be empty")
 	}
-	// Additional validations can be added as needed
+
 	return nil
 }

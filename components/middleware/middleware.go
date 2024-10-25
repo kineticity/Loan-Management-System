@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"loanApp/models/user" // Ensure to import your user model package
@@ -16,18 +17,18 @@ var SecretKey = []byte("it'sDevthedev") // Make sure to use a secure key in prod
 
 // Claims struct to hold the user claims
 type Claims struct {
-	Email    string    `json:"email"`
-	Password string    `json:"password"`
-	Role     user.Role `json:"role"`
+	UserID uint      `json:"user_id"`
+	Email  string    `json:"email"`
+	Role   user.Role `json:"role"`
 	jwt.StandardClaims
 }
 
-// NewClaims creates a new Claims object
-func NewClaims(email string, password string, role user.Role, expirationDate time.Time) *Claims {
+// NewClaims updated to include UserID
+func NewClaims(userID uint, email string, role user.Role, expirationDate time.Time) *Claims {
 	return &Claims{
-		Email:    email,
-		Password: password,
-		Role:     role,
+		UserID: userID,
+		Email:  email,
+		Role:   role,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expirationDate.Unix(),
 		},
@@ -48,7 +49,6 @@ func (c *Claims) Signing() (string, error) {
 	return token.SignedString(SecretKey)
 }
 
-// TokenAuthMiddleware checks for a valid JWT token
 func TokenAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -57,13 +57,24 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		// Remove "Bearer " prefix and check if the token is blacklisted
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		if IsTokenBlacklisted(tokenStr) {
+			http.Error(w, "Token has been invalidated, please log in again", http.StatusUnauthorized)
+			return
+		}
+
+		// Verify and parse JWT claims
 		claims, err := VerifyJWT(authHeader)
 		if err != nil {
 			http.Error(w, "Invalid token", http.StatusUnauthorized)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), "claims", claims)
+		// Attach the email directly to the request context
+		ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
+		ctx = context.WithValue(ctx, "role", claims.Role)
+		ctx = context.WithValue(ctx, "claims", claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

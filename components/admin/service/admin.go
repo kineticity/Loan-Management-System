@@ -56,7 +56,7 @@ func (u *AdminService) CreateAdmin(newAdmin *user.Admin) error {
 }
 
 // GetAllAdmins retrieves all admins from the database
-func (u *AdminService) GetAllAdmins(allAdmins []*user.Admin, totalCount *int, parser web.Parser) error {
+func (u *AdminService) GetAllAdmins(allAdmins *[]*user.Admin, totalCount *int, parser web.Parser) error {
 	uow := repository.NewUnitOfWork(u.DB)
 	defer uow.RollBack()
 
@@ -72,7 +72,9 @@ func (u *AdminService) GetAllAdmins(allAdmins []*user.Admin, totalCount *int, pa
 	}
 
 	queryProcessors := []repository.QueryProcessor{
-		u.repository.Filter("name=?", parser.Form.Get("name")),
+		// u.repository.Filter("name=?", parser.Form.Get("name")),
+		u.repository.Preload("LoginInfo"),
+		// u.repository.Preload("LoanOfficers"),
 		u.repository.Limit(limit),
 		u.repository.Offset(offset),
 	}

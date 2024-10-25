@@ -18,6 +18,7 @@ type Repository interface {
 	Filter(condition string, args ...interface{}) QueryProcessor
 	Count(limit, offset int, totalCount *int) QueryProcessor
 	GetUserWithLoginInfo(uow *UOW, userID uint) (*user.User, error)
+	Preload(association string) QueryProcessor
 }
 
 // GormRepositoryMySQL is an implementation of the Repository interface

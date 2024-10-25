@@ -1,10 +1,13 @@
 package service
 
 import (
+	"errors"
 	"loanApp/app"
 	"loanApp/models/user"
 	"loanApp/repository"
 	"loanApp/utils/log"
+	"loanApp/utils/web"
+	"strconv"
 
 	"github.com/jinzhu/gorm"
 )
@@ -26,37 +29,66 @@ func NewLoanOfficerService(db *gorm.DB, repository repository.Repository, log lo
 func (s *LoanOfficerService) CreateLoanOfficer(officer *user.LoanOfficer) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
-	// Validate newAdmin fields
-	// if err := validateOfficer(officer); err != nil {
-	// 	return err
-	// }
-	err := s.repository.Add(uow, &officer.User) // Add user first
+
+	// Validate newOfficer fields
+	if err := validateLoanOfficer(officer); err != nil {
+		return err
+	}
+
+	// First, add the User
+	err := s.repository.Add(uow, &officer.User)
 	if err != nil {
 		return err
 	}
 
-	// Then, use the same User ID to create the Admin
-	officer.ID = officer.User.ID         // Link admin to the user by setting UserID
-	err = s.repository.Add(uow, officer) // Add admin
+	// Set the LoanOfficer ID to match the User ID
+	officer.ID = officer.User.ID
+
+	// Then, add the LoanOfficer
+	err = s.repository.Add(uow, officer)
 	if err != nil {
 		return err
 	}
 
-	if err := s.repository.Add(uow, officer); err != nil {
-		return err
-	}
-
-	app.AllLoanOfficers = append(app.AllLoanOfficers, officer)
+	// Commit the transaction
 	uow.Commit()
+
+	// Append to the global list of Loan Officers
+	app.AllLoanOfficers = append(app.AllLoanOfficers, officer)
 	return nil
 }
 
-func (s *LoanOfficerService) GetAllLoanOfficers() ([]*user.LoanOfficer, error) {
-	var officers []*user.LoanOfficer
-	if err := s.repository.GetAll(nil, &officers); err != nil {
-		return nil, err
+// GetAllAdmins retrieves all admins from the database
+func (s *LoanOfficerService) GetAllLoanOfficers(allOfficers *[]*user.LoanOfficer, totalCount *int, parser web.Parser) error {
+	uow := repository.NewUnitOfWork(s.DB)
+	defer uow.RollBack()
+
+	// Parse limit and offset as integers
+	limit, err := strconv.Atoi(parser.Form.Get("limit"))
+	if err != nil {
+		limit = 12 // Set a default value if parsing fails
 	}
-	return officers, nil
+
+	offset, err := strconv.Atoi(parser.Form.Get("offset"))
+	if err != nil {
+		offset = 0 // Set a default value if parsing fails
+	}
+
+	queryProcessors := []repository.QueryProcessor{
+		// s.repository.Filter("name=?", parser.Form.Get("name")),
+		s.repository.Preload("LoginInfo"),
+		// s.repository.Preload("UpdatedBy"),
+		// s.repository.Preload("AssignedLoans"),
+		s.repository.Limit(limit),
+		s.repository.Offset(offset),
+	}
+
+	if err := s.repository.GetAll(uow, allOfficers, queryProcessors...); err != nil {
+		return err
+	}
+
+	uow.Commit()
+	return nil
 }
 
 func (s *LoanOfficerService) UpdateLoanOfficer(id string, updatedOfficer *user.LoanOfficer) error {
@@ -73,6 +105,9 @@ func (s *LoanOfficerService) UpdateLoanOfficer(id string, updatedOfficer *user.L
 	officer.Password = updatedOfficer.Password
 
 	if err := s.repository.Update(uow, &officer); err != nil {
+		return err
+	}
+	if err := s.repository.Update(uow, &officer.User); err != nil {
 		return err
 	}
 
@@ -93,6 +128,29 @@ func (s *LoanOfficerService) DeleteLoanOfficer(id string) error {
 		return err
 	}
 
+	var user user.User
+	if err := s.repository.GetByID(uow, &user, id); err != nil {
+		return err
+	}
+
+	if err := s.repository.DeleteByID(uow, &user, id); err != nil {
+		return err
+	}
+
 	uow.Commit()
+	return nil
+}
+
+func validateLoanOfficer(loanOfficer *user.LoanOfficer) error {
+	if loanOfficer.Name == "" {
+		return errors.New("name cannot be empty")
+	}
+	if loanOfficer.Email == "" {
+		return errors.New("email cannot be empty")
+	}
+	if loanOfficer.Password == "" {
+		return errors.New("password cannot be empty")
+	}
+	// Additional validations can be added as needed
 	return nil
 }

@@ -52,7 +52,7 @@ func NewApp(name string, db *gorm.DB, log log.Logger,
 	}
 }
 func NewDBConnection(log log.Logger) *gorm.DB {
-	db, err := gorm.Open("mysql", "root:{password}@/LoanManagementSystem?charset=utf8&parseTime=True&loc=Local")
+	db, err := gorm.Open("mysql", "root:Bank1mbha!Bank1mbha!@/LoanManagementSystem?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {
 		log.Error(err.Error())
 		return nil
@@ -126,7 +126,7 @@ func (a *App) StopServer() {
 // ClearDatabase drops specified tables in the database.
 func ClearDatabase() {
 	// Connect to the database
-	db, err := gorm.Open("mysql", "root:{password}@tcp(localhost:3306)/LoanManagementSystem?charset=utf8&parseTime=True&loc=Local")
+	db, err := gorm.Open("mysql", "root:Bank1mbha!Bank1mbha!@tcp(localhost:3306)/LoanManagementSystem?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {
 		log.GetLogger().Error("failed to connect to database: %v", err)
 		return

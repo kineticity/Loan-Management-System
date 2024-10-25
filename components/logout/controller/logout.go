@@ -29,7 +29,6 @@ func NewLogoutController(userService *service.UserService, logoutService *logout
 func (lc *LogoutController) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/logout", lc.LogoutHandler).Methods(http.MethodPost)
 }
-
 func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	// Extract token from the Authorization header
 	tok := r.Header.Get("Authorization")
@@ -41,15 +40,20 @@ func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request
 	// Remove the "Bearer " prefix
 	tokenStr := strings.TrimPrefix(tok, "Bearer ")
 
+	// Check if the token is already blacklisted
+	if middleware.IsTokenBlacklisted(tokenStr) {
+		http.Error(w, "Token has already been invalidated", http.StatusUnauthorized)
+		return
+	}
+
 	// Parse the token
 	claims := &middleware.Claims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-		// Make sure to validate the token's signing method here
+		// Validate the token's signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		// Return the secret key (replace with your actual secret)
-		return []byte("it'sDevthedev"), nil
+		return []byte("it'sDevthedev"), nil // Replace with your actual secret key
 	})
 
 	if err != nil || !token.Valid {
@@ -57,7 +61,7 @@ func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Now you can get the user ID from the claims
+	// Retrieve the user by email from the claims
 	email := claims.Email
 	user, err := lc.UserService.GetUserByEmail(email)
 	if err != nil {
@@ -65,9 +69,14 @@ func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Blacklist the token
-	middleware.BlacklistToken(tok)
-	lc.LogoutService.UpdateLoginInfo(user)
+	// Blacklist the token to prevent further use
+	middleware.BlacklistToken(tokenStr)
+
+	// Update the logout information for the user
+	if err := lc.LogoutService.UpdateLoginInfo(user); err != nil {
+		http.Error(w, "Failed to update logout info", http.StatusInternalServerError)
+		return
+	}
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Logged out successfully"))

@@ -47,7 +47,7 @@ func RespondWithError(w http.ResponseWriter, status int, message string) {
 
 // GetUserIDFromContext extracts userID from the request context
 func GetUserIDFromContext(r *http.Request) (uint, error) {
-	userID, ok := r.Context().Value("it'sDevthedev").(uint)
+	userID, ok := r.Context().Value("user_id").(uint)
 	if !ok {
 		return 0, errors.New("user ID not found in context")
 	}
