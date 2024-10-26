@@ -2,10 +2,9 @@ package document
 
 import "github.com/jinzhu/gorm"
 
-// Document struct
 type Document struct {
 	gorm.Model
-	LoanApplicationID int    `gorm:"not null"`
+	LoanApplicationID uint    `gorm:"not null"` //int->uint //foreign key refereneces loanapplications(id)
 	DocumentType      string `gorm:"not null"`
 	URL               string `gorm:"not null"`
 }

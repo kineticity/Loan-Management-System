@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	logoutservice "loanApp/components/logout/service" // Adjust based on your project structure
-	"loanApp/components/middleware"                   // Import your middleware package
-	"loanApp/components/user/service"                 // Adjust based on your project structure
+	logoutservice "loanApp/components/logout/service" 
+	"loanApp/components/middleware"                   
+	"loanApp/components/user/service"                 
 
 	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/mux"
@@ -25,19 +25,16 @@ func NewLogoutController(userService *service.UserService, logoutService *logout
 	}
 }
 
-// RegisterRoutes registers the login route
 func (lc *LogoutController) RegisterRoutes(router *mux.Router) {
 	router.HandleFunc("/logout", lc.LogoutHandler).Methods(http.MethodPost)
 }
 func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request) {
-	// Extract token from the Authorization header
 	tok := r.Header.Get("Authorization")
 	if tok == "" {
 		http.Error(w, "Authorization header is missing", http.StatusUnauthorized)
 		return
 	}
 
-	// Remove the "Bearer " prefix
 	tokenStr := strings.TrimPrefix(tok, "Bearer ")
 
 	// Check if the token is already blacklisted
@@ -53,7 +50,7 @@ func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte("it'sDevthedev"), nil // Replace with your actual secret key
+		return []byte("it'sDevthedev"), nil 
 	})
 
 	if err != nil || !token.Valid {
@@ -61,7 +58,6 @@ func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Retrieve the user by email from the claims
 	email := claims.Email
 	user, err := lc.UserService.GetUserByEmail(email)
 	if err != nil {
@@ -69,10 +65,9 @@ func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Blacklist the token to prevent further use
 	middleware.BlacklistToken(tokenStr)
 
-	// Update the logout information for the user
+	// Update the logout information in logininfo
 	if err := lc.LogoutService.UpdateLoginInfo(user); err != nil {
 		http.Error(w, "Failed to update logout info", http.StatusInternalServerError)
 		return

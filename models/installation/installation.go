@@ -6,10 +6,9 @@ import (
 	"github.com/jinzhu/gorm"
 )
 
-// Installation struct
 type Installation struct {
 	gorm.Model
-	LoanApplicationID int       `gorm:"not null"`
+	LoanApplicationID uint       `gorm:"not null"` //foreign key refereneces loanapplications(id)
 	AmountToBePaid    float64   `gorm:"not null"`
 	DueDate           time.Time `gorm:"not null"`
 	PaymentDate       time.Time `gorm:"nullable"`

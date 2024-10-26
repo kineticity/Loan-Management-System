@@ -55,26 +55,25 @@ func (u *AdminService) CreateAdmin(newAdmin *user.Admin) error {
 	return nil
 }
 
-// GetAllAdmins retrieves all admins from the database
 func (u *AdminService) GetAllAdmins(allAdmins *[]*user.Admin, totalCount *int, parser web.Parser) error {
 	uow := repository.NewUnitOfWork(u.DB)
 	defer uow.RollBack()
 
-	// Parse limit and offset as integers
 	limit, err := strconv.Atoi(parser.Form.Get("limit"))
 	if err != nil {
-		limit = 12 // Set a default value if parsing fails
+		limit = 12 //default
 	}
 
 	offset, err := strconv.Atoi(parser.Form.Get("offset"))
 	if err != nil {
-		offset = 0 // Set a default value if parsing fails
+		offset = 0 //default
 	}
 
 	queryProcessors := []repository.QueryProcessor{
 		// u.repository.Filter("name=?", parser.Form.Get("name")),
 		u.repository.Preload("LoginInfo"),
-		// u.repository.Preload("LoanOfficers"),
+		u.repository.Preload("LoanOfficers"), //<---------------------------------------------uncommented
+
 		u.repository.Limit(limit),
 		u.repository.Offset(offset),
 	}
@@ -87,7 +86,7 @@ func (u *AdminService) GetAllAdmins(allAdmins *[]*user.Admin, totalCount *int, p
 	return nil
 }
 
-// validateAdmin validates the admin data
+// validateAdmin validates the admin data //remove later
 func validateAdmin(admin *user.Admin) error {
 	if admin.Name == "" {
 		return errors.New("name cannot be empty")
@@ -98,6 +97,5 @@ func validateAdmin(admin *user.Admin) error {
 	if admin.Password == "" {
 		return errors.New("password cannot be empty")
 	}
-	// Additional validations can be added as needed
 	return nil
 }

@@ -118,7 +118,8 @@ func main() {
 	adminService := service.NewAdminService(db, repository, logger)
 	application := app.NewApp("Loan-Management-System", db, logger, &wg, repository)
 
-	app.ClearDatabase()
+	// app.ClearDatabase()
+	
 	// Initialize router and server
 	application.Init()
 
@@ -127,6 +128,9 @@ func main() {
 
 	// Models, migrations, etc.
 	modules.ConfigureAppTables(application)
+
+	// Create Super Admin before starting the server
+	createSuperAdmin(adminService)
 
 	// Start server in a goroutine
 	wg.Add(1) // Increment the WaitGroup counter
@@ -139,16 +143,13 @@ func main() {
 		}
 	}()
 
-	createSuperAdmin(adminService)
-
 	// Wait for all goroutines to finish (in this case, just the server)
 	wg.Wait() // Wait here until the server stops
 	stopApp(application)
 }
 
 func stopApp(app *app.App) {
-	// Implement logic to gracefully stop the application
-	app.StopServer() // Ensure you have a method to stop the server
+	app.StopServer() 
 	fmt.Println("Application stopped")
 }
 
@@ -160,12 +161,11 @@ func createSuperAdmin(adminService *service.AdminService) {
 			Password:  "password",
 			IsActive:  true,
 			Role:      "Admin",
-			LoginInfo: []*logininfo.LoginInfo{}, // Initialize empty slice
+			LoginInfo: []*logininfo.LoginInfo{}, 
 		},
-		LoanOfficers: []*user.LoanOfficer{}, // Initialize empty slice
+		LoanOfficers: []*user.LoanOfficer{}, 
 	}
 
-	// Call the CreateAdmin service method
 	err := adminService.CreateAdmin(superadmin)
 	if err != nil {
 		fmt.Println("Error creating super admin:", err)

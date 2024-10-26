@@ -29,7 +29,7 @@ func NewAdminController(AdminService *service.AdminService, log log.Logger) *Adm
 func (a *AdminController) RegisterRoutes(router *mux.Router) {
 	adminRouter := router.PathPrefix("/admin").Subrouter()
 	adminRouter.Use(middleware.TokenAuthMiddleware)
-	adminRouter.Use(middleware.AdminOnly) // Admin authorization middleware applied globally
+	adminRouter.Use(middleware.AdminOnly) // Admin authorization middleware
 	adminRouter.HandleFunc("/", a.CreateAdmin).Methods(http.MethodPost)
 	adminRouter.HandleFunc("/", a.GetAllAdmins).Methods(http.MethodGet)
 }
@@ -44,12 +44,13 @@ func (a *AdminController) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate admin data
 	if err := validateAdmin(newAdmin); err != nil {
 		a.log.Error("Validation error: ", err)
 		web.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	newAdmin.Role="Admin" //<----------------------------------------------------------------------added
 
 	if err := a.AdminService.CreateAdmin(&newAdmin); err != nil {
 		a.log.Error("Error creating admin: ", err)
@@ -76,7 +77,6 @@ func (a *AdminController) GetAllAdmins(w http.ResponseWriter, r *http.Request) {
 	web.RespondWithJSON(w, http.StatusOK, allAdmins)
 }
 
-// validateAdmin validates the admin data
 func validateAdmin(admin user.Admin) error {
 	if admin.Name == "" {
 		return errors.New("name cannot be empty")

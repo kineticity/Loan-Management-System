@@ -23,7 +23,6 @@ func NewLoginInfoService(db *gorm.DB, repo repository.Repository, logger log.Log
 	}
 }
 
-// CreateLoginInfo saves the login information in the database
 func (s *LoginInfoService) CreateLoginInfo(info *logininfo.LoginInfo) (*logininfo.LoginInfo,error) {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()

@@ -3,6 +3,9 @@ package app
 import (
 	"context"
 	"fmt"
+	"loanApp/models/document"
+	"loanApp/models/installation"
+	"loanApp/models/loanapplication"
 	"loanApp/models/loanscheme"
 	"loanApp/models/logininfo"
 	"loanApp/models/user"
@@ -52,7 +55,7 @@ func NewApp(name string, db *gorm.DB, log log.Logger,
 	}
 }
 func NewDBConnection(log log.Logger) *gorm.DB {
-	db, err := gorm.Open("mysql", "root:{pw}!@/LoanManagementSystem?charset=utf8&parseTime=True&loc=Local")
+	db, err := gorm.Open("mysql", "root:Forcepointpassword@1@/loanapp?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {
 		log.Error(err.Error())
 		return nil
@@ -101,10 +104,9 @@ func (app *App) RegisterAllControllerRoutes(controllers []Controller) {
 	}
 }
 func (a *App) StartServer() error {
-	// Initialize the server with a custom address and handler
 	a.Server = &http.Server{
 		Addr:    ":4000",
-		Handler: a.Router, // Assume you have a router set up
+		Handler: a.Router,
 	}
 
 	fmt.Println("Server Exposed On 4000")
@@ -115,7 +117,6 @@ func (a *App) StopServer() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Shut down the server gracefully
 	if err := a.Server.Shutdown(ctx); err != nil {
 		fmt.Printf("Server forced to shutdown: %v\n", err)
 	}
@@ -123,18 +124,16 @@ func (a *App) StopServer() {
 	fmt.Println("Server shut down gracefully")
 }
 
-// ClearDatabase drops specified tables in the database.
+// ClearDatabase for TESTING
 func ClearDatabase() {
-	// Connect to the database
-	db, err := gorm.Open("mysql", "root:{pw}!@tcp(localhost:3306)/LoanManagementSystem?charset=utf8&parseTime=True&loc=Local")
+	db, err := gorm.Open("mysql", "root:Forcepointpassword@1@/loanapp?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {
 		log.GetLogger().Error("failed to connect to database: %v", err)
 		return
 	}
-	defer db.Close() // Close the database connection when done
+	defer db.Close()
 
-	// Drop the tables
-	if err := db.DropTableIfExists(&user.User{}, &user.Admin{}, &user.Customer{}, &user.LoanOfficer{}, &logininfo.LoginInfo{}).Error; err != nil {
+	if err := db.DropTableIfExists(&user.User{}, &user.Admin{}, &user.Customer{}, &user.LoanOfficer{}, &logininfo.LoginInfo{}, &loanscheme.LoanScheme{}, &loanapplication.LoanApplication{}, &document.Document{}, &installation.Installation{}).Error; err != nil {
 		log.GetLogger().Error("failed to drop tables: %v", err)
 		return
 	}
@@ -150,4 +149,18 @@ func (app *App) TableMigration(moduleConfigs []ModuleConfig) {
 	for i := 0; i < len(moduleConfigs); i++ {
 		moduleConfigs[i].TableMigration()
 	}
+
+	app.DB.Model(&logininfo.LoginInfo{}).AddForeignKey("user_id", "users(id)", "CASCADE", "CASCADE")
+
+	app.DB.Model(&user.LoanOfficer{}).AddForeignKey("created_by_admin_id", "users(id)", "RESTRICT", "RESTRICT")
+
+	app.DB.Model(&loanscheme.LoanScheme{}).AddForeignKey("admin_id", "users(id)", "RESTRICT", "RESTRICT")
+
+	app.DB.Model(&loanapplication.LoanApplication{}).AddForeignKey("loan_scheme_id", "loan_schemes(id)", "CASCADE", "CASCADE")
+	app.DB.Model(&loanapplication.LoanApplication{}).AddForeignKey("customer_id", "users(id)", "CASCADE", "CASCADE")
+	app.DB.Model(&loanapplication.LoanApplication{}).AddForeignKey("loan_officer_id", "users(id)", "CASCADE", "CASCADE")
+
+	app.DB.Model(&installation.Installation{}).AddForeignKey("loan_application_id", "loan_applications(id)", "CASCADE", "CASCADE")
+	
+	app.DB.Model(&document.Document{}).AddForeignKey("loan_application_id", "loan_applications(id)", "CASCADE", "CASCADE")
 }

@@ -23,13 +23,10 @@ func NewLoginService(db *gorm.DB, repository repository.Repository, log log.Logg
 	}
 }
 
-// CreateAdmin creates a new admin in the database
 func (l *LoginService) CreateLoginInfo(user *user.User,logininfo *logininfo.LoginInfo) error {
 
 	user.LoginInfo = append(user.LoginInfo, logininfo)
 
-
-	// Transaction
 	uow := repository.NewUnitOfWork(l.DB)
 	defer uow.RollBack()
 
