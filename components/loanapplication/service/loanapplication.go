@@ -29,42 +29,40 @@ func NewLoanApplicationService(db *gorm.DB, repository repository.Repository, lo
 }
 
 // local folder for documents
-const DocumentUploadDir = "C:\\Users\\keertana.kalathingal\\Documents\\LMS 2\\4 Loan Management System\\4 Loan Management System\\uploads"
-
+const DocumentUploadDir = "C:\\Users\\Dev.patel\\Downloads\\4 Loan Management System 26th given final\\4 Loan Management System\\uploads"
 
 func (s *LoanApplicationService) CreateLoanApplicationWithDocs(application *loanapplication.LoanApplication, docs []*document.Document) error {
-    uow := repository.NewUnitOfWork(s.DB)
-    defer uow.RollBack()
- 
-    application.ApplicationDate = time.Now()
- 
-    var officer *user.LoanOfficer
-    ser := service.NewLoanOfficerService(s.DB, s.repository, s.log)
+	uow := repository.NewUnitOfWork(s.DB)
+	defer uow.RollBack()
 
-    
-    officer, err := ser.GetLeastLoadedOfficer() //officer has least workload
-    if err != nil {
-        return err
-    }
-    application.LoanOfficerID = officer.ID
- 
-    if err := s.repository.Add(uow, application); err != nil {
-        return err
-    }
-    officer.AssignedLoans = append(officer.AssignedLoans, application) //
-    if err := s.repository.Update(uow, officer); err != nil {
-        return err
-    }
+	application.ApplicationDate = time.Now()
 
-    for _, doc := range docs {
-        doc.LoanApplicationID = application.ID
-        if err := s.repository.Add(uow, doc); err != nil {
-            return err
-        }
-    }
- 
-    uow.Commit()
-    return nil
+	var officer *user.LoanOfficer
+	ser := service.NewLoanOfficerService(s.DB, s.repository, s.log)
+
+	officer, err := ser.GetLeastLoadedOfficer() //officer has least workload
+	if err != nil {
+		return err
+	}
+	application.LoanOfficerID = officer.ID
+
+	if err := s.repository.Add(uow, application); err != nil {
+		return err
+	}
+	officer.AssignedLoans = append(officer.AssignedLoans, application) //
+	if err := s.repository.Update(uow, officer); err != nil {
+		return err
+	}
+
+	for _, doc := range docs {
+		doc.LoanApplicationID = application.ID
+		if err := s.repository.Add(uow, doc); err != nil {
+			return err
+		}
+	}
+
+	uow.Commit()
+	return nil
 }
 
 func (s *LoanApplicationService) GetLoanApplicationsByCustomer(customerID uint, applications *[]loanapplication.LoanApplication) error {
@@ -75,6 +73,7 @@ func (s *LoanApplicationService) GetLoanApplicationsByCustomer(customerID uint, 
 		s.repository.Filter("customer_id = ?", customerID),
 		// s.repository.Preload("Installations"), //uncomment later
 		s.repository.Preload("Documents"),
+		s.repository.Preload("Installations"),
 	}
 
 	if err := s.repository.GetAll(uow, applications, queryProcessors...); err != nil {

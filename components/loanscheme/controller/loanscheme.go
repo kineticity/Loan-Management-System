@@ -5,12 +5,12 @@ import (
 	"net/http"
 
 	"loanApp/app"
+	"loanApp/components/loanscheme/service"
 	"loanApp/components/middleware"
 	"loanApp/models/loanscheme"
 	"loanApp/models/user"
 	"loanApp/utils/log"
 	"loanApp/utils/web"
-	"loanApp/components/loanscheme/service"
 
 	"github.com/gorilla/mux"
 )
@@ -30,7 +30,7 @@ func NewLoanSchemeController(loanSchemeService *service.LoanSchemeService, log l
 func (c *LoanSchemeController) RegisterRoutes(router *mux.Router) {
 	schemeRouter := router.PathPrefix("/loan-scheme").Subrouter()
 	schemeRouter.Use(middleware.TokenAuthMiddleware)
-	schemeRouter.Use(middleware.AdminOnly) // Only admins can access
+	schemeRouter.Use(middleware.AdminOnly)
 	schemeRouter.HandleFunc("/", c.CreateLoanScheme).Methods(http.MethodPost)
 	schemeRouter.HandleFunc("/", c.GetAllLoanSchemes).Methods(http.MethodGet)
 	schemeRouter.HandleFunc("/{id}", c.UpdateLoanScheme).Methods(http.MethodPut)
@@ -41,6 +41,17 @@ func (c *LoanSchemeController) CreateLoanScheme(w http.ResponseWriter, r *http.R
 	var newScheme loanscheme.LoanScheme
 	if err := json.NewDecoder(r.Body).Decode(&newScheme); err != nil {
 		c.log.Error("Invalid input: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "Invalid input")
+		return
+	}
+
+	if newScheme.Tenure <= 0 {
+		c.log.Error("invalid loan scheme tenure: must be greater than zero")
+		web.RespondWithError(w, http.StatusBadRequest, "Invalid input")
+		return
+	}
+	if newScheme.InterestRate <= 0 {
+		c.log.Error("invalid loan scheme interest rate: must be greater than zero")
 		web.RespondWithError(w, http.StatusBadRequest, "Invalid input")
 		return
 	}
@@ -66,7 +77,7 @@ func (c *LoanSchemeController) CreateLoanScheme(w http.ResponseWriter, r *http.R
 	}
 
 	newScheme.CreatedBy = admin
-	newScheme.AdminID=admin.ID
+	newScheme.AdminID = admin.ID
 
 	if err := c.LoanSchemeService.CreateLoanScheme(&newScheme); err != nil {
 		c.log.Error("Error creating loan scheme: ", err)
@@ -74,7 +85,7 @@ func (c *LoanSchemeController) CreateLoanScheme(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	app.AllLoanSchemes=append(app.AllLoanSchemes, &newScheme)
+	app.AllLoanSchemes = append(app.AllLoanSchemes, &newScheme)
 
 	web.RespondWithJSON(w, http.StatusCreated, newScheme)
 }
@@ -85,8 +96,7 @@ func (c *LoanSchemeController) GetAllLoanSchemes(w http.ResponseWriter, r *http.
 
 	parser := web.NewParser(r)
 
-
-	if err := c.LoanSchemeService.GetAllLoanSchemes(&allSchemes, &totalCount,*parser); err != nil {
+	if err := c.LoanSchemeService.GetAllLoanSchemes(&allSchemes, &totalCount, *parser); err != nil {
 		c.log.Error("Error fetching loan schemes: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not fetch loan schemes")
 		return

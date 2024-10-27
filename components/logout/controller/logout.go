@@ -5,11 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	logoutservice "loanApp/components/logout/service" 
-	"loanApp/components/middleware"                   
-	"loanApp/components/user/service"                 
+	logoutservice "loanApp/components/logout/service"
+	"loanApp/components/middleware"
+	"loanApp/components/user/service"
+	"loanApp/models/userclaims"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 )
 
@@ -44,13 +45,13 @@ func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request
 	}
 
 	// Parse the token
-	claims := &middleware.Claims{}
+	claims := &userclaims.UserClaims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 		// Validate the token's signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
-		return []byte("it'sDevthedev"), nil 
+		return []byte("it'sDevthedev"), nil
 	})
 
 	if err != nil || !token.Valid {

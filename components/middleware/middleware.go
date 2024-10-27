@@ -7,44 +7,29 @@ import (
 	"strings"
 	"time"
 
-	"loanApp/models/user" 
+	"loanApp/models/user"
+	"loanApp/models/userclaims"
 	"loanApp/utils/web"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/dgrijalva/jwt-go"
 )
 
-var SecretKey = []byte("it'sDevthedev") 
+var SecretKey = []byte("it'sDevthedev")
 
-type Claims struct {
-	UserID uint      `json:"user_id"`
-	Email  string    `json:"email"`
-	Role   user.Role `json:"role"`
-	jwt.StandardClaims
-}
-
-func NewClaims(userID uint, email string, role user.Role, expirationDate time.Time) *Claims {
-	return &Claims{
-		UserID: userID,
-		Email:  email,
-		Role:   role,
+// SigningToken signs the JWT token with the user information
+func SigningToken(u *user.User, expirationTime time.Time) (string, error) {
+	claims := &userclaims.UserClaims{
+		User: *u, // Embed the user struct
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: expirationDate.Unix(),
+			ExpiresAt: expirationTime.Unix(),
 		},
 	}
-}
 
-func (c *Claims) Valid() error {
-	if time.Now().Unix() > c.ExpiresAt {
-		return errors.New("token has expired")
-	}
-	return nil
-}
-
-func (c *Claims) Signing() (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString(SecretKey)
 }
 
+// TokenAuthMiddleware checks the JWT token in the Authorization header
 func TokenAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -59,21 +44,20 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		claims, err := VerifyJWT(authHeader)
+		claims, err := VerifyJWT(tokenStr)
 		if err != nil {
 			http.Error(w, "Invalid token", http.StatusUnauthorized)
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), "user_id", claims.UserID)
-		ctx = context.WithValue(ctx, "role", claims.Role)
-		ctx = context.WithValue(ctx, "claims", claims)
+		ctx := context.WithValue(r.Context(), "claims", claims)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-func VerifyJWT(tokenStr string) (*Claims, error) {
-	claims := &Claims{}
+// VerifyJWT verifies the token and extracts the claims
+func VerifyJWT(tokenStr string) (*userclaims.UserClaims, error) {
+	claims := &userclaims.UserClaims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
 		return SecretKey, nil
 	})
@@ -86,43 +70,16 @@ func VerifyJWT(tokenStr string) (*Claims, error) {
 	return claims, nil
 }
 
-// func VerifyRoleMiddleware(allowedRoles ...user.Role) func(http.Handler) http.Handler {
-// 	return func(next http.Handler) http.Handler {
-// 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-// 			claims, ok := r.Context().Value("claims").(*Claims)
-// 			if !ok || claims == nil {
-// 				http.Error(w, "Unauthorized: claims not found", http.StatusUnauthorized)
-// 				return
-// 			}
-
-// 			isAllowed := false
-// 			for _, role := range allowedRoles {
-// 				if claims.Role == role {
-// 					isAllowed = true
-// 					break
-// 				}
-// 			}
-
-// 			if !isAllowed {
-// 				http.Error(w, "Unauthorized: insufficient permissions", http.StatusForbidden)
-// 				return
-// 			}
-
-// 			next.ServeHTTP(w, r)
-// 		})
-// 	}
-// }
-
-
+// AdminOnly middleware restricts access to admins only
 func AdminOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		claims, ok := r.Context().Value("claims").(*Claims)
+		claims, ok := r.Context().Value("claims").(*userclaims.UserClaims)
 		if !ok || claims == nil {
 			web.RespondWithError(w, http.StatusUnauthorized, "Unauthorized: claims not found")
 			return
 		}
 
-		if claims.Role != "Admin" {
+		if claims.User.Role != "Admin" {
 			web.RespondWithError(w, http.StatusForbidden, "Unauthorized access")
 			return
 		}
@@ -131,15 +88,34 @@ func AdminOnly(next http.Handler) http.Handler {
 	})
 }
 
+// CustomerOnly middleware restricts access to customers only
 func CustomerOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		claims, ok := r.Context().Value("claims").(*Claims)
+		claims, ok := r.Context().Value("claims").(*userclaims.UserClaims)
 		if !ok || claims == nil {
 			web.RespondWithError(w, http.StatusUnauthorized, "Unauthorized: claims not found")
 			return
 		}
 
-		if claims.Role != "Customer" {
+		if claims.User.Role != "Customer" {
+			web.RespondWithError(w, http.StatusForbidden, "Unauthorized access")
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// CustomerOnly middleware restricts access to customers only
+func LoanOfficerOnly(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := r.Context().Value("claims").(*userclaims.UserClaims)
+		if !ok || claims == nil {
+			web.RespondWithError(w, http.StatusUnauthorized, "Unauthorized: claims not found")
+			return
+		}
+
+		if claims.User.Role != "Loan Officer" {
 			web.RespondWithError(w, http.StatusForbidden, "Unauthorized access")
 			return
 		}

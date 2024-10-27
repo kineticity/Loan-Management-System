@@ -29,7 +29,7 @@ func NewAdminController(AdminService *service.AdminService, log log.Logger) *Adm
 func (a *AdminController) RegisterRoutes(router *mux.Router) {
 	adminRouter := router.PathPrefix("/admin").Subrouter()
 	adminRouter.Use(middleware.TokenAuthMiddleware)
-	adminRouter.Use(middleware.AdminOnly) // Admin authorization middleware
+	adminRouter.Use(middleware.AdminOnly)
 	adminRouter.HandleFunc("/", a.CreateAdmin).Methods(http.MethodPost)
 	adminRouter.HandleFunc("/", a.GetAllAdmins).Methods(http.MethodGet)
 }
@@ -50,7 +50,7 @@ func (a *AdminController) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newAdmin.Role="Admin" //<----------------------------------------------------------------------added
+	newAdmin.Role = "Admin" //<----------------------------------------------------------------------added
 
 	if err := a.AdminService.CreateAdmin(&newAdmin); err != nil {
 		a.log.Error("Error creating admin: ", err)

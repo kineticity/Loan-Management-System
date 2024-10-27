@@ -27,10 +27,10 @@ type Admin struct {
 }
 
 type LoanOfficer struct {
-	User          
-	CreatedByAdminID     uint //foreign key references admin(id)
-	UpdatedBy     []*Admin //later
-	AssignedLoans []*loanapplication.LoanApplication `gorm:"foreignKey:LoanOfficerID"`
+	User
+	CreatedByAdminID uint                               //foreign key references admin(id)
+	UpdatedBy        []*Admin                           //later
+	AssignedLoans    []*loanapplication.LoanApplication `gorm:"foreignKey:LoanOfficerID"`
 }
 
 type Customer struct {

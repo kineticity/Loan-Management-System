@@ -55,7 +55,7 @@ func NewApp(name string, db *gorm.DB, log log.Logger,
 	}
 }
 func NewDBConnection(log log.Logger) *gorm.DB {
-	db, err := gorm.Open("mysql", "root:Forcepointpassword@1@/loanapp?charset=utf8&parseTime=True&loc=Local")
+	db, err := gorm.Open("mysql", "root:Bank1mbha!Bank1mbha!@/LoanManagementSystem?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {
 		log.Error(err.Error())
 		return nil
@@ -126,18 +126,18 @@ func (a *App) StopServer() {
 
 // ClearDatabase for TESTING
 func ClearDatabase() {
-	db, err := gorm.Open("mysql", "root:Forcepointpassword@1@/loanapp?charset=utf8&parseTime=True&loc=Local")
+	db, err := gorm.Open("mysql", "root:Bank1mbha!Bank1mbha!@/LoanManagementSystem?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {
 		log.GetLogger().Error("failed to connect to database: %v", err)
 		return
 	}
 	defer db.Close()
-
+	db.Exec("SET FOREIGN_KEY_CHECKS = 0;")
 	if err := db.DropTableIfExists(&user.User{}, &user.Admin{}, &user.Customer{}, &user.LoanOfficer{}, &logininfo.LoginInfo{}, &loanscheme.LoanScheme{}, &loanapplication.LoanApplication{}, &document.Document{}, &installation.Installation{}).Error; err != nil {
 		log.GetLogger().Error("failed to drop tables: %v", err)
 		return
 	}
-
+	db.Exec("SET FOREIGN_KEY_CHECKS = 1;")
 	log.GetLogger().Info("All tables dropped successfully!")
 }
 
@@ -161,6 +161,6 @@ func (app *App) TableMigration(moduleConfigs []ModuleConfig) {
 	app.DB.Model(&loanapplication.LoanApplication{}).AddForeignKey("loan_officer_id", "users(id)", "CASCADE", "CASCADE")
 
 	app.DB.Model(&installation.Installation{}).AddForeignKey("loan_application_id", "loan_applications(id)", "CASCADE", "CASCADE")
-	
+
 	app.DB.Model(&document.Document{}).AddForeignKey("loan_application_id", "loan_applications(id)", "CASCADE", "CASCADE")
 }

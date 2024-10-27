@@ -32,8 +32,6 @@
 // 	// 	logger.Error("Db closed")
 // 	// }()
 
-	
-
 // 	repository := repository.NewGormRepositoryMySQL()
 // 	adminService := service.NewAdminService(db, repository, logger)
 // 	application := app.NewApp("Loan-Management-System", db, logger, &wg, repository)
@@ -119,7 +117,7 @@ func main() {
 	application := app.NewApp("Loan-Management-System", db, logger, &wg, repository)
 
 	// app.ClearDatabase()
-	
+
 	// Initialize router and server
 	application.Init()
 
@@ -149,7 +147,7 @@ func main() {
 }
 
 func stopApp(app *app.App) {
-	app.StopServer() 
+	app.StopServer()
 	fmt.Println("Application stopped")
 }
 
@@ -161,9 +159,9 @@ func createSuperAdmin(adminService *service.AdminService) {
 			Password:  "password",
 			IsActive:  true,
 			Role:      "Admin",
-			LoginInfo: []*logininfo.LoginInfo{}, 
+			LoginInfo: []*logininfo.LoginInfo{},
 		},
-		LoanOfficers: []*user.LoanOfficer{}, 
+		LoanOfficers: []*user.LoanOfficer{},
 	}
 
 	err := adminService.CreateAdmin(superadmin)

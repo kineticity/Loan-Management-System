@@ -2,12 +2,18 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"loanApp/app"
+	"loanApp/models/installation"
+	"loanApp/models/loanapplication"
+	"loanApp/models/loanscheme"
 	"loanApp/models/user"
 	"loanApp/repository"
 	"loanApp/utils/log"
 	"loanApp/utils/web"
+	"math"
 	"strconv"
+	"time"
 
 	"github.com/jinzhu/gorm"
 )
@@ -162,71 +168,85 @@ func (s *LoanOfficerService) GetLeastLoadedOfficer() (*user.LoanOfficer, error) 
 }
 
 // //by id get
-// func (s *LoanOfficerService) GetAssignedLoanApplications(loanOfficerID uint) ([]*loanapplication.LoanApplication, error) {
-// 	var applications []*loanapplication.LoanApplication
-// 	err := s.DB.Where("loan_officer_id = ?", loanOfficerID).Find(&applications).Error
-// 	if err != nil {
-// 		return nil, err
-// 	}
-// 	return applications, nil
-// }
+func (s *LoanOfficerService) GetAssignedLoanApplications(loanOfficerID uint) ([]*loanapplication.LoanApplication, error) {
+	var applications []*loanapplication.LoanApplication
+	err := s.DB.Where("loan_officer_id = ?", loanOfficerID).Find(&applications).Error
+	if err != nil {
+		return nil, err
+	}
+	return applications, nil
+}
+func (s *LoanOfficerService) ProcessApplicationDecision(applicationID string, approve bool) error {
+	var application loanapplication.LoanApplication
+	uow := repository.NewUnitOfWork(s.DB)
+	defer uow.RollBack()
 
-// func (s *LoanOfficerService) ProcessApplicationDecision(applicationID string, approve bool) error {
-// 	var application loanapplication.LoanApplication
+	// Retrieve the loan application
+	if err := s.repository.GetByID(uow, &application, applicationID); err != nil {
+		return fmt.Errorf("failed to retrieve application: %w", err)
+	}
 
-// 	uow := repository.NewUnitOfWork(s.DB)
+	if approve {
+		application.Status = "Approved"
+		decisionDate := time.Now()
+		application.DecisionDate = &decisionDate
 
-// 	if err := s.DB.First(&application, applicationID).Error; err != nil {
-// 		return fmt.Errorf("failed to retrieve application: %w", err)
-// 	}
+		if err := s.generateInstallments(&application, uow); err != nil {
+			return fmt.Errorf("failed to generate installments: %w", err)
+		}
+	} else {
+		application.Status = "Rejected"
+	}
 
-// 	if approve {
-// 		application.Status = "Approved"
-// 		decisionDate := time.Now()
-// 		application.DecisionDate = &decisionDate
+	// Update application status
+	if err := s.repository.Update(uow, &application); err != nil {
+		return fmt.Errorf("failed to update application status: %w", err)
+	}
 
-// 		err := s.generateInstallments(&application, uow)
-// 		if err != nil {
-// 			return fmt.Errorf("failed to generate installments: %w", err)
-// 		}
-// 	} else {
-// 		application.Status = "Rejected"
-// 	}
+	// Commit transaction only after all operations are successful
+	uow.Commit()
+	return nil
+}
 
-// 	if err := s.DB.Save(&application).Error; err != nil {
-// 		return fmt.Errorf("failed to update application status: %w", err)
-// 	}
+// generateInstallments creates monthly installments based on loan tenure and amount
+func (s *LoanOfficerService) generateInstallments(application *loanapplication.LoanApplication, uow *repository.UOW) error {
+	var loanScheme loanscheme.LoanScheme
 
-// 	return nil
-// }
+	// Fetch the loan scheme using GetByID
+	if err := s.repository.GetByID(uow, &loanScheme, application.LoanSchemeID); err != nil {
+		return fmt.Errorf("failed to fetch loan scheme: %w", err)
+	}
+	if loanScheme.ID == 0 {
+		return fmt.Errorf("loan scheme not found for ID: %d", application.LoanSchemeID)
+	}
 
-// // generateInstallments creates monthly installments based on loan tenure and amount
-// func (s *LoanOfficerService) generateInstallments(application *loanapplication.LoanApplication, uow *repository.UOW) error {
-// 	var loanScheme loanscheme.LoanScheme
+	// Calculate monthly rate and EMI
+	monthlyRate := loanScheme.InterestRate / 12 / 100
+	emi := (application.Amount * monthlyRate) / (1 - math.Pow(1+monthlyRate, -float64(loanScheme.Tenure)))
 
-// 	// Fetch the loan scheme using GetByID
-// 	err := s.repository.GetByID(uow, &loanScheme, application.LoanSchemeID)
-// 	if err != nil {
-// 		return fmt.Errorf("failed to fetch loan scheme: %w", err)
-// 	}
+	// Prepare installments based on the tenure
+	installments := make([]*installation.Installation, loanScheme.Tenure)
+	for i := 0; i < loanScheme.Tenure; i++ {
+		installmentDate := time.Now().AddDate(0, i+1, 0)
+		dueDate := time.Date(
+			installmentDate.Year(),
+			installmentDate.Month(),
+			installmentDate.Day(),
+			0, 0, 0, 0,
+			installmentDate.Location(),
+		)
 
-// 	// Calculate monthly rate and EMI
-// 	monthlyRate := loanScheme.InterestRate / 12 / 100
-// 	emi := (application.Amount * monthlyRate) / (1 - math.Pow(1+monthlyRate, -float64(loanScheme.Tenure)))
+		installments[i] = &installation.Installation{
+			LoanApplicationID: application.ID,
+			AmountToBePaid:    emi,
+			DueDate:           dueDate,
+			Status:            "Pending",
+		}
 
-// 	// Prepare installments based on the tenure
-// 	installments := make([]*installation.Installation, loanScheme.Tenure)
-// 	for i := 0; i < loanScheme.Tenure; i++ {
-// 		dueDate := time.Now().AddDate(0, i+1, 0) // Monthly due date for each installment
-
-// 		installments[i] = &installation.Installation{
-// 			LoanApplicationID: int(application.ID),
-// 			AmountToBePaid:    emi,
-// 			DueDate:           dueDate,
-// 			Status:            "Pending",
-// 		}
-// 	}
-
-// 	// Save the installments to the database
-// 	return s.DB.Create(&installments).Error
-// }
+		// Add each installment as a separate transaction to prevent long transaction times
+		if err := s.repository.Add(uow, installments[i]); err != nil {
+			return fmt.Errorf("failed to save installment: %w", err)
+		}
+	}
+	return nil
+}

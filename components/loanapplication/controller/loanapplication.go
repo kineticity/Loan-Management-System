@@ -33,7 +33,7 @@ func NewLoanApplicationController(loanAppService *service.LoanApplicationService
 func (c *LoanApplicationController) RegisterRoutes(router *mux.Router) {
 	loanAppRouter := router.PathPrefix("/loan-applications").Subrouter()
 	loanAppRouter.Use(middleware.TokenAuthMiddleware)
-	loanAppRouter.Use(middleware.CustomerOnly) // Customer Authorization
+	loanAppRouter.Use(middleware.CustomerOnly)
 	loanAppRouter.HandleFunc("", c.CreateLoanApplicationWithDocs).Methods(http.MethodPost)
 	loanAppRouter.HandleFunc("", c.GetCustomerLoanApplications).Methods(http.MethodGet)
 }
@@ -80,7 +80,6 @@ func (c *LoanApplicationController) CreateLoanApplicationWithDocs(w http.Respons
 		IsNPA:           false,
 	}
 
-	
 	//todo: make separate keys for documents, chanfe filename/path to include user id,loan app id
 	var documents []*document.Document
 	files := r.MultipartForm.File["documents"] // key=documents
