@@ -170,12 +170,23 @@ func (s *LoanOfficerService) GetLeastLoadedOfficer() (*user.LoanOfficer, error) 
 // //by id get
 func (s *LoanOfficerService) GetAssignedLoanApplications(loanOfficerID uint) ([]*loanapplication.LoanApplication, error) {
 	var applications []*loanapplication.LoanApplication
-	err := s.DB.Where("loan_officer_id = ?", loanOfficerID).Find(&applications).Error
+	uow := repository.NewUnitOfWork(s.DB)
+	// QueryProcessors to filter by LoanOfficerID and preload associations
+	queryProcessors := []repository.QueryProcessor{
+		s.repository.Filter("loan_officer_id = ?", loanOfficerID),
+		s.repository.Preload("Installations"),
+		s.repository.Preload("Documents"),
+	}
+
+	// Use the repository's GetAll method with the UOW and QueryProcessors
+	err := s.repository.GetAll(uow, &applications, queryProcessors...)
 	if err != nil {
 		return nil, err
 	}
+
 	return applications, nil
 }
+
 func (s *LoanOfficerService) ProcessApplicationDecision(applicationID string, approve bool) error {
 	var application loanapplication.LoanApplication
 	uow := repository.NewUnitOfWork(s.DB)
