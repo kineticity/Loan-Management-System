@@ -1,7 +1,12 @@
 package repository
 
 import (
+	"loanApp/models/loanapplication"
+	"loanApp/models/logininfo"
+	"loanApp/models/statistics"
 	"loanApp/models/user"
+	"log"
+	"time"
 
 	"github.com/jinzhu/gorm"
 )
@@ -18,6 +23,15 @@ type Repository interface {
 	Count(limit, offset int, totalCount *int) QueryProcessor
 	GetUserWithLoginInfo(uow *UOW, userID uint) (*user.User, error)
 	Preload(association string) QueryProcessor
+	OrderBy(orderCondition string) QueryProcessor
+
+	GetActiveUsersCount(uow *UOW, startDate, endDate time.Time) (int64, error)
+	GetTotalLoanApplicationsCount(uow *UOW, startDate, endDate time.Time) (int64, error)
+	GetNPACount(uow *UOW, startDate, endDate time.Time) (int64, error)
+	GetLoginInfosForCustomers(uow *UOW, startDate, endDate time.Time) ([]logininfo.LoginInfo, error)
+
+	GetLoanSchemeStats(uow *UOW, startDate, endDate time.Time) ([]statistics.LoanSchemeStats, error)
+	GetLoanOfficerStats(uow *UOW, startDate, endDate time.Time) ([]statistics.LoanOfficerStats, error)
 }
 
 type GormRepositoryMySQL struct{} //->implements repository
@@ -113,6 +127,13 @@ func (g *GormRepositoryMySQL) Preload(association string) QueryProcessor {
 	}
 }
 
+func (g *GormRepositoryMySQL) OrderBy(orderCondition string) QueryProcessor {
+	return func(db *gorm.DB, out interface{}) (*gorm.DB, error) {
+		db = db.Order(orderCondition)
+		return db, nil
+	}
+}
+
 type UOW struct {
 	DB       *gorm.DB
 	Commited bool
@@ -148,4 +169,67 @@ func (g *GormRepositoryMySQL) GetUserWithLoginInfo(uow *UOW, userID uint) (*user
 		return nil, err
 	}
 	return &foundUser, nil
+}
+
+func (g *GormRepositoryMySQL) GetActiveUsersCount(uow *UOW, startDate, endDate time.Time) (int64, error) {
+	var count int64
+	err := uow.DB.Table("login_infos"). // Start with login_infos to count logins
+						Joins("JOIN users ON users.id = login_infos.user_id").
+						Where("users.is_active = ? AND login_time BETWEEN ? AND ? AND users.role = ?", true, startDate, endDate, "Customer").
+						Count(&count).Error
+	return count, err
+}
+
+// GetTotalLoanApplicationsCount returns the total count of loan applications within a specific date range.
+func (g *GormRepositoryMySQL) GetTotalLoanApplicationsCount(uow *UOW, startDate, endDate time.Time) (int64, error) {
+	var count int64
+	err := uow.DB.Model(&loanapplication.LoanApplication{}).
+		Where("application_date BETWEEN ? AND ?", startDate, endDate).
+		Count(&count).Error
+	return count, err
+}
+
+// GetNPACount returns the count of NPAs within a specific date range.
+func (g *GormRepositoryMySQL) GetNPACount(uow *UOW, startDate, endDate time.Time) (int64, error) {
+	var count int64
+	err := uow.DB.Model(&loanapplication.LoanApplication{}).
+		Where("is_npa = ? AND application_date BETWEEN ? AND ?", true, startDate, endDate).
+		Count(&count).Error
+	return count, err
+}
+
+// GetLoginInfosForCustomers returns the login information of customers within a specific date range.
+func (g *GormRepositoryMySQL) GetLoginInfosForCustomers(uow *UOW, startDate, endDate time.Time) ([]logininfo.LoginInfo, error) {
+	var loginInfos []logininfo.LoginInfo
+	err := uow.DB.Table("login_infos").
+		Select("login_infos.*"). // Select all columns from login_infos
+		Joins("JOIN users ON users.id = login_infos.user_id").
+		Where("login_time BETWEEN ? AND ? AND users.role = ?", startDate, endDate, "Customer").
+		Find(&loginInfos).Error
+	return loginInfos, err
+}
+
+// GetLoanSchemeStats returns statistics per loan scheme within a specific date range.
+func (g *GormRepositoryMySQL) GetLoanSchemeStats(uow *UOW, startDate, endDate time.Time) ([]statistics.LoanSchemeStats, error) {
+	var stats []statistics.LoanSchemeStats
+	err := uow.DB.Table("loan_applications").
+		Select("loan_scheme_id as scheme_id, COUNT(*) as application_count, SUM(CASE WHEN is_npa = 1 THEN 1 ELSE 0 END) as non_performing_asset_in_scheme").
+		Where("application_date >= ? AND application_date <= ?", startDate, endDate).
+		Group("scheme_id").
+		Scan(&stats).Error
+
+	// Log the output for debugging
+	log.Printf("Loan Scheme Stats: %+v, Error: %v", stats, err)
+	return stats, err
+}
+
+// GetLoanOfficerStats returns statistics per loan officer within a specific date range.
+func (g *GormRepositoryMySQL) GetLoanOfficerStats(uow *UOW, startDate, endDate time.Time) ([]statistics.LoanOfficerStats, error) {
+	var stats []statistics.LoanOfficerStats
+	err := uow.DB.Table("loan_applications").
+		Select("loan_officer_id as officer_id, COUNT(*) as application_count, SUM(CASE WHEN is_npa = 1 THEN 1 ELSE 0 END) as non_performing_asset_from_officer").
+		Where("application_date BETWEEN ? AND ?", startDate, endDate).
+		Group("officer_id").
+		Scan(&stats).Error
+	return stats, err
 }

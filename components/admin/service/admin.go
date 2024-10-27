@@ -1,12 +1,13 @@
 package service
 
 import (
-	"errors"
 	"loanApp/app"
+	"loanApp/models/statistics"
 	"loanApp/models/user"
 	"loanApp/repository"
 	"loanApp/utils/log"
 	"loanApp/utils/web"
+	"time"
 
 	"strconv"
 
@@ -29,10 +30,6 @@ func NewAdminService(db *gorm.DB, repository repository.Repository, log log.Logg
 
 // CreateAdmin creates a new admin in the database
 func (u *AdminService) CreateAdmin(newAdmin *user.Admin) error {
-	// Validate newAdmin fields
-	if err := validateAdmin(newAdmin); err != nil {
-		return err
-	}
 
 	// Transaction
 	uow := repository.NewUnitOfWork(u.DB)
@@ -86,16 +83,69 @@ func (u *AdminService) GetAllAdmins(allAdmins *[]*user.Admin, totalCount *int, p
 	return nil
 }
 
-// validateAdmin validates the admin data //remove later
-func validateAdmin(admin *user.Admin) error {
-	if admin.Name == "" {
-		return errors.New("name cannot be empty")
+func (s *AdminService) GetStatistics(startDate, endDate time.Time) (*statistics.Statistics, error) {
+	uow := repository.NewUnitOfWork(s.DB)
+	defer uow.RollBack()
+
+	// Get count of active users
+	activeUsersCount, err := s.repository.GetActiveUsersCount(uow, startDate, endDate)
+	if err != nil {
+		return nil, err
 	}
-	if admin.Email == "" {
-		return errors.New("email cannot be empty")
+
+	// Calculate average session time
+	loginInfos, err := s.repository.GetLoginInfosForCustomers(uow, startDate, endDate)
+	if err != nil {
+		return nil, err
 	}
-	if admin.Password == "" {
-		return errors.New("password cannot be empty")
+
+	var totalSessionTime float64
+	var sessionCount int
+	for _, loginInfo := range loginInfos {
+		if loginInfo.LogoutTime != nil {
+			totalSessionTime += loginInfo.LogoutTime.Sub(loginInfo.LoginTime).Minutes()
+			sessionCount++
+		}
 	}
-	return nil
+
+	averageSessionTime := 0.0
+	if sessionCount > 0 {
+		averageSessionTime = totalSessionTime / float64(sessionCount)
+	}
+
+	// Get total loan applications count
+	loanApplicationsCount, err := s.repository.GetTotalLoanApplicationsCount(uow, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get NPA loan applications count
+	npaCount, err := s.repository.GetNPACount(uow, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get statistics per loan scheme
+	loanSchemeStats, err := s.repository.GetLoanSchemeStats(uow, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get statistics per loan officer
+	loanOfficerStats, err := s.repository.GetLoanOfficerStats(uow, startDate, endDate)
+	if err != nil {
+		return nil, err
+	}
+
+	stats := &statistics.Statistics{
+		ActiveCustomersCount:       int(activeUsersCount),
+		AverageCustomerSessionTime: averageSessionTime,
+		TotalLoanApplications:      int(loanApplicationsCount),
+		NPACount:                   int(npaCount),
+		SchemeStats:                loanSchemeStats,
+		OfficerStats:               loanOfficerStats,
+	}
+
+	uow.Commit()
+	return stats, nil
 }

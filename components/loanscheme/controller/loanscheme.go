@@ -45,8 +45,8 @@ func (c *LoanSchemeController) CreateLoanScheme(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if newScheme.Tenure <= 0 {
-		c.log.Error("invalid loan scheme tenure: must be greater than zero")
+	if newScheme.Tenure < 3 {
+		c.log.Error("invalid loan scheme tenure: must be minimum 3 months")
 		web.RespondWithError(w, http.StatusBadRequest, "Invalid input")
 		return
 	}

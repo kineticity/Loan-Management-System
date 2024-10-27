@@ -36,6 +36,8 @@ func (c *LoanApplicationController) RegisterRoutes(router *mux.Router) {
 	loanAppRouter.Use(middleware.CustomerOnly)
 	loanAppRouter.HandleFunc("", c.CreateLoanApplicationWithDocs).Methods(http.MethodPost)
 	loanAppRouter.HandleFunc("", c.GetCustomerLoanApplications).Methods(http.MethodGet)
+	loanAppRouter.HandleFunc("/{id}/pay", c.PayInstallment).Methods(http.MethodPut) //just put link no requestbody for pay
+
 }
 
 // todo: loan officer assign with minimum load , loanschemeid verify
@@ -147,3 +149,34 @@ func (c *LoanApplicationController) GetCustomerLoanApplications(w http.ResponseW
 
 	web.RespondWithJSON(w, http.StatusOK, applications)
 }
+
+func (c *LoanApplicationController) PayInstallment(w http.ResponseWriter, r *http.Request) {
+	c.log.Info("PayInstallment called")
+
+	customerID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("Unauthorized access: ", err)
+		web.RespondWithError(w, http.StatusUnauthorized, "Unauthorized access")
+		return
+	}
+
+	// Parse and validate loan application ID from route parameters
+	vars := mux.Vars(r)
+	loanAppID, err := strconv.ParseUint(vars["id"], 10, 32)
+	if err != nil {
+		c.log.Error("Invalid loan application ID: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "Invalid loan application ID")
+		return
+	}
+
+	// Call the service to process payment for the nearest due installment
+	err = c.LoanAppService.PayInstallment(uint(customerID), uint(loanAppID))
+	if err != nil {
+		c.log.Error("Error processing installment payment: ", err)
+		web.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	web.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Nearest due installment paid successfully"})
+}
+

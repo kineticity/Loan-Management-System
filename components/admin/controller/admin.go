@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"loanApp/components/admin/service"
 	"loanApp/components/middleware"
@@ -32,6 +33,7 @@ func (a *AdminController) RegisterRoutes(router *mux.Router) {
 	adminRouter.Use(middleware.AdminOnly)
 	adminRouter.HandleFunc("/", a.CreateAdmin).Methods(http.MethodPost)
 	adminRouter.HandleFunc("/", a.GetAllAdmins).Methods(http.MethodGet)
+	adminRouter.HandleFunc("/stats", a.GetStatistics).Methods(http.MethodGet)
 }
 
 func (a *AdminController) CreateAdmin(w http.ResponseWriter, r *http.Request) {
@@ -89,4 +91,35 @@ func validateAdmin(admin user.Admin) error {
 	}
 
 	return nil
+}
+
+func (a *AdminController) GetStatistics(w http.ResponseWriter, r *http.Request) {
+	a.log.Info("GetStatistics called")
+
+	// Parse time range from query parameters
+	startDateStr := r.URL.Query().Get("start_date")
+	endDateStr := r.URL.Query().Get("end_date")
+
+	// Validate dates
+	startDate, err := time.Parse("2006-01-02", startDateStr)
+	if err != nil {
+		web.RespondWithError(w, http.StatusBadRequest, "Invalid start date format, use YYYY-MM-DD")
+		return
+	}
+	endDate, err := time.Parse("2006-01-02", endDateStr)
+	if err != nil {
+		web.RespondWithError(w, http.StatusBadRequest, "Invalid end date format, use YYYY-MM-DD")
+		return
+	}
+
+	// Fetch statistics from the service
+	stats, err := a.AdminService.GetStatistics(startDate, endDate)
+	if err != nil {
+		a.log.Error("Error fetching statistics: ", err)
+		web.RespondWithError(w, http.StatusInternalServerError, "Could not fetch statistics")
+		return
+	}
+
+	// Respond with the statistics
+	web.RespondWithJSON(w, http.StatusOK, stats)
 }

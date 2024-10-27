@@ -152,11 +152,11 @@ func validateLoanOfficer(loanOfficer *user.LoanOfficer) error {
 	return nil
 }
 
-// returns the loan officer with the least workload / assignedloanapplications
+// GetLeastLoadedOfficer returns the loan officer with the least workload based on pending loan applications
 func (s *LoanOfficerService) GetLeastLoadedOfficer() (*user.LoanOfficer, error) {
 	var officer user.LoanOfficer
 	err := s.DB.Model(&user.LoanOfficer{}).
-		Joins("LEFT JOIN loan_applications ON loan_officers.id = loan_applications.loan_officer_id").
+		Joins("LEFT JOIN loan_applications ON loan_officers.id = loan_applications.loan_officer_id AND loan_applications.status = ?", "Pending").
 		Group("loan_officers.id").
 		Order("COUNT(loan_applications.id) ASC").
 		First(&officer).Error
@@ -197,7 +197,7 @@ func (s *LoanOfficerService) ProcessApplicationDecision(applicationID string, ap
 		return fmt.Errorf("failed to retrieve application: %w", err)
 	}
 
-	if approve {
+	if approve && application.Status == "Pending" {
 		application.Status = "Approved"
 		decisionDate := time.Now()
 		application.DecisionDate = &decisionDate
@@ -205,6 +205,11 @@ func (s *LoanOfficerService) ProcessApplicationDecision(applicationID string, ap
 		if err := s.generateInstallments(&application, uow); err != nil {
 			return fmt.Errorf("failed to generate installments: %w", err)
 		}
+	} else if application.Status == "Approved" || application.Status == "Paid off" {
+		return errors.New("this application is already approved/paid off")
+
+	} else if application.Status == "Rejected" {
+		return errors.New("this application was already rejected")
 	} else {
 		application.Status = "Rejected"
 	}
@@ -235,17 +240,35 @@ func (s *LoanOfficerService) generateInstallments(application *loanapplication.L
 	monthlyRate := loanScheme.InterestRate / 12 / 100
 	emi := (application.Amount * monthlyRate) / (1 - math.Pow(1+monthlyRate, -float64(loanScheme.Tenure)))
 
-	// Prepare installments based on the tenure
+	// // Prepare installments based on the tenure
+	// installments := make([]*installation.Installation, loanScheme.Tenure)
+	// for i := 0; i < loanScheme.Tenure; i++ {
+	// 	installmentDate := time.Now().AddDate(0, i+1, 0)
+	// 	dueDate := time.Date(
+	// 		installmentDate.Year(),
+	// 		installmentDate.Month(),
+	// 		installmentDate.Day(),
+	// 		0, 0, 0, 0,
+	// 		installmentDate.Location(),
+	// 	)
+
+	// 	installments[i] = &installation.Installation{
+	// 		LoanApplicationID: application.ID,
+	// 		AmountToBePaid:    emi,
+	// 		DueDate:           dueDate,
+	// 		Status:            "Pending",
+	// 	}
+
+	// 	// Add each installment as a separate transaction to prevent long transaction times
+	// 	if err := s.repository.Add(uow, installments[i]); err != nil {
+	// 		return fmt.Errorf("failed to save installment: %w", err)
+	// 	}
+	// }
+	// Prepare installments based on the tenure with 1-minute interval due dates
 	installments := make([]*installation.Installation, loanScheme.Tenure)
 	for i := 0; i < loanScheme.Tenure; i++ {
-		installmentDate := time.Now().AddDate(0, i+1, 0)
-		dueDate := time.Date(
-			installmentDate.Year(),
-			installmentDate.Month(),
-			installmentDate.Day(),
-			0, 0, 0, 0,
-			installmentDate.Location(),
-		)
+		// Set the due date to 1-minute intervals from the current time
+		dueDate := time.Now().Add(time.Duration(i+1) * time.Minute)
 
 		installments[i] = &installation.Installation{
 			LoanApplicationID: application.ID,
@@ -259,5 +282,23 @@ func (s *LoanOfficerService) generateInstallments(application *loanapplication.L
 			return fmt.Errorf("failed to save installment: %w", err)
 		}
 	}
+
 	return nil
+}
+func (s *LoanOfficerService) IsApplicationAssignedToOfficer(applicationID string, loanOfficerID uint) (bool, error) {
+	var application loanapplication.LoanApplication
+	uow := repository.NewUnitOfWork(s.DB)
+	defer uow.RollBack()
+
+	// Retrieve the loan application
+	if err := s.repository.GetByID(uow, &application, applicationID); err != nil {
+		return false, fmt.Errorf("failed to retrieve application: %w", err)
+	}
+
+	// Check if the LoanOfficerID matches the given officer ID
+	if application.LoanOfficerID == loanOfficerID {
+		return true, nil
+	}
+
+	return false, nil
 }

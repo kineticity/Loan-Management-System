@@ -165,10 +165,30 @@ func (c *LoanOfficerController) GetAssignedLoanApplications(w http.ResponseWrite
 
 	web.RespondWithJSON(w, http.StatusOK, applications)
 }
-
 func (c *LoanOfficerController) ApproveOrRejectApplication(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	applicationID := vars["id"]
+
+	// Get the user ID of the loan officer from the request context
+	userID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("User ID not found in context:", err)
+		web.RespondWithError(w, http.StatusUnauthorized, "Unauthorized access")
+		return
+	}
+
+	// Check if the application is assigned to the loan officer
+	isAssigned, err := c.LoanOfficerService.IsApplicationAssignedToOfficer(applicationID, userID)
+	if err != nil {
+		c.log.Error("Error checking application assignment:", err)
+		web.RespondWithError(w, http.StatusInternalServerError, "Could not verify application assignment")
+		return
+	}
+	if !isAssigned {
+		c.log.Error("Unauthorized access: Application not assigned to this officer")
+		web.RespondWithError(w, http.StatusForbidden, "You are not authorized to make this decision")
+		return
+	}
 
 	var decision struct {
 		Approve bool `json:"approve"`
@@ -179,7 +199,7 @@ func (c *LoanOfficerController) ApproveOrRejectApplication(w http.ResponseWriter
 		return
 	}
 
-	err := c.LoanOfficerService.ProcessApplicationDecision(applicationID, decision.Approve)
+	err = c.LoanOfficerService.ProcessApplicationDecision(applicationID, decision.Approve)
 	if err != nil {
 		c.log.Error("Error processing loan application decision:", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Error processing application decision")

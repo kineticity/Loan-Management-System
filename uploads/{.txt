@@ -1,0 +1,42 @@
+{
+  "username":"admin",
+  "password":"admin123"
+}
+
+{
+    "username": "newCustomer",
+    "password": "customerPass123",
+    "firstName": "John",
+    "lastName": "Doe"
+}
+
+{
+  "userId": 1,
+  "username": "CustomerBob",
+  "password": "CustomerBob123",
+  "firstName": "Bob",
+  "lastName": "Builder",
+  "isAdmin": false
+}
+
+// // Generate JWT Token for the user
+// func GenerateJWT(username string, isAdmin bool) (string, error) {
+// 	expirationTime := time.Now().Add(24 * time.Hour)
+
+// 	claims := &Claims{
+// 		Username: username,
+// 		IsAdmin:  isAdmin,
+// 		StandardClaims: jwt.StandardClaims{
+// 			ExpiresAt: expirationTime.Unix(),
+// 		},
+// 	}
+
+// 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+// 	tokenString, err := token.SignedString(secretKey)
+
+// 	if err != nil {
+// 		return "", err
+// 	}
+
+// 	return tokenString, nil
+// }
