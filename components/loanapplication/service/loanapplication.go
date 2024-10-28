@@ -39,7 +39,7 @@ func NewLoanApplicationService(db *gorm.DB, repository repository.Repository, lo
 	}
 }
 
-const DocumentUploadDir = "C:\\Users\\Dev.patel\\Downloads\\4 Loan Management System 27th mail_pay_npa\\4 Loan Management System\\upload"
+const DocumentUploadDir = "C:\\Users\\keertana.kalathingal\\Documents\\LMS 3\\4 Loan Management System\\upload"
 
 func (s *LoanApplicationService) GetLoanApplicationsByCustomer(customerID uint, applications *[]loanapplication.LoanApplication) error {
 	uow := repository.NewUnitOfWork(s.DB)
@@ -110,31 +110,47 @@ func (s *LoanApplicationService) ApplyForLoan(customerID uint, loanSchemeID uint
 func (s *LoanApplicationService) UploadCollateralDocuments(applicationID string, customerID uint, files []*multipart.FileHeader) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
+	s.log.Info("upload collateral service called")
 
 	canUpload, err := s.CanUploadCollateral(applicationID, customerID)
 	if err != nil || !canUpload {
 		return err
 	}
 
+	s.log.Info("can upload collateral checked")
+
+
 	var application loanapplication.LoanApplication
 	if err := s.repository.GetByID(uow, &application, applicationID); err != nil {
 		return fmt.Errorf("failed to retrieve application: %w", err)
 	}
+
+	s.log.Info("retrieved application:",application)
+
 
 	for _, fileHeader := range files {
 		doc, err := s.saveDocument(fileHeader, "collateral_documents", application.ID)
 		if err != nil {
 			return err
 		}
+
+		s.log.Info("saved doc:",doc.DocumentType)
+
 		if err := s.repository.Add(uow, doc); err != nil {
 			return err
 		}
+
+		s.log.Info("added to db doc:",doc.DocumentType)
+
 	}
 
 	application.Status = "Collateral Uploaded"
 	if err := s.repository.Update(uow, &application); err != nil {
 		return fmt.Errorf("failed to update application status: %w", err)
 	}
+
+	s.log.Info("updated lioan applications table:",application)
+
 
 	uow.Commit()
 	return nil
@@ -144,10 +160,14 @@ func (s *LoanApplicationService) CanUploadCollateral(applicationID string, custo
 	var application loanapplication.LoanApplication
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
+	s.log.Info("where is traas")
+
 	applicationIDint, err := strconv.Atoi(applicationID)
 	if err != nil {
 		return false, err
 	}
+
+	s.log.Info("where is traas")
 
 	err = s.repository.GetByID(uow, &application, applicationIDint,
 		s.repository.Filter("customer_id = ?", customerID),
@@ -156,8 +176,12 @@ func (s *LoanApplicationService) CanUploadCollateral(applicationID string, custo
 	if err != nil {
 		return false, err
 	}
+	s.log.Info("where is traas")
 
-	return application.Status == "Approved", nil
+
+	// return application.Status == "Approved", nil
+	return true, nil
+
 }
 
 func (s *LoanApplicationService) saveDocument(fileHeader *multipart.FileHeader, docType string, applicationID uint) (*document.Document, error) {
@@ -223,6 +247,8 @@ func (s *LoanApplicationService) PayInstallment(customerID, loanApplicationID ui
 		s.repository.OrderBy("due_date ASC"),
 		s.repository.Limit(1),
 	)
+	fmt.Println("installments:",installment)
+
 	if err != nil || installment.ID == 0 {
 		var loanapp loanapplication.LoanApplication
 
@@ -230,11 +256,15 @@ func (s *LoanApplicationService) PayInstallment(customerID, loanApplicationID ui
 		if err != nil {
 			return errors.New("loan application not found")
 		}
+		if loanapp.CustomerID!=customerID{
+			return errors.New("not this customer's loan application")
+		}
 
 		loanapp.Status = "Paid Off"
 		if err := s.repository.Update(uow, &loanapp); err != nil {
 			return errors.New("failed to update loan application status to paid off")
 		}
+		uow.Commit()
 		return errors.New("no pending installments found for this loan application")
 
 	}
@@ -268,7 +298,7 @@ func (s *LoanApplicationService) CheckForNPA() error {
 		err := s.repository.GetAll(uow, &installments,
 			s.repository.Filter("loan_application_id = ?", app.ID),
 			s.repository.Filter("status = ?", "Pending"),
-			s.repository.Filter("due_date < ?", now), // Ensure installments are overdue
+			s.repository.Filter("due_date < ?", now), 
 			s.repository.OrderBy("due_date DESC"),
 			s.repository.Limit(3),
 		)

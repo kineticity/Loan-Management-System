@@ -52,7 +52,6 @@ func (s *LoanSchemeService) GetAllLoanSchemes(allSchemes *[]*loanscheme.LoanSche
 	}
 
 	queryProcessors := []repository.QueryProcessor{
-
 		s.repository.Limit(limit),
 		s.repository.Offset(offset),
 	}

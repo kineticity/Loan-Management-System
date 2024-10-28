@@ -114,6 +114,8 @@ func (c *LoanApplicationController) UploadCollateralDocuments(w http.ResponseWri
 		return
 	}
 
+	c.log.Info("collateral docs:",files)
+
 	err = c.LoanAppService.UploadCollateralDocuments(applicationID, customerID, files)
 	if err != nil {
 		c.log.Error("Error uploading collateral documents: ", err)

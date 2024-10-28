@@ -208,6 +208,10 @@ func (s *LoanOfficerService) ApproveInitialApplication(applicationID string, loa
 		return fmt.Errorf("failed to retrieve application: %w", err)
 	}
 
+	if application.LoanOfficerID!=loanOfficerID{
+		return errors.New("this application is assigned to another officer")
+	}
+
 	if application.Status == "Approved" || application.Status == "Rejected" || application.Status == "PendingCollateral" {
 		return errors.New("invalid operation: application has already been processed")
 	}
@@ -246,13 +250,10 @@ func (s *LoanOfficerService) sendApprovalEmail(application *loanapplication.Loan
 	// Email content
 	subject := "Loan Approval, Pending Collateral"
 	message := fmt.Sprintf(`
-        "Dear " + %s + ",\n\n" +
-		"Your loan application (ID: %d) has been approved. Please upload your collateral documents within one week. " +
-		"If the documents are not uploaded within the stipulated time, your application will be rejected.\n\n" +
-		"Thank you for your attention.\n\n" +
-		"Best regards,\n" +
-		"Your Loan Management Team"
-
+        Dear %s
+		Your loan application (ID: %d) has been approved. Please upload your collateral documents within one week.
+		If the documents are not uploaded within the stipulated time, your application will be rejected.
+		Thank you for your attention.
 
         Best regards,
         Loanleloplis
@@ -311,13 +312,10 @@ func (s *LoanOfficerService) sendRejectionEmail(application *loanapplication.Loa
 	// Email content
 	subject := "Loan Rejection due to Pending Collateral"
 	message := fmt.Sprintf(`
-        "Dear " + %s + ",\n\n" +
-		"Your loan application (ID: %d) has been rejected since you did not upload collateral documents within one week. " +
-		"You may apply for another loan if you are still interested.\n\n" +
-		"Thank you for your attention.\n\n" +
-		"Best regards,\n" +
-		"Your Loan Management Team"
-
+        Dear %s
+		Your loan application (ID: %d) has been rejected since you did not upload collateral documents within one week.
+		You may apply for another loan if you are still interested.
+		Thank you for your attention.
 
         Best regards,
         Loanleloplis
@@ -358,8 +356,12 @@ func (s *LoanOfficerService) ApproveCollateralDocuments(applicationID string, lo
 		return fmt.Errorf("failed to retrieve application: %w", err)
 	}
 
-	if application.Status != "PendingCollateral" {
-		return errors.New("application is not pending collateral approval")
+	if application.LoanOfficerID!=loanOfficerID{
+		return errors.New("application is assigned to another loan officer")
+	}
+
+	if application.Status != "Collateral Uploaded" {
+		return errors.New("no collateral documents. application status is not collateral uploaded")
 	}
 
 	if approve {
@@ -398,13 +400,10 @@ func (s *LoanOfficerService) sendFinalApprovalEmail(application *loanapplication
 
 	subject := "Loan Approved!"
 	message := fmt.Sprintf(`
-        "Dear " + %s + ",\n\n" +
-		"Congratulations! Your loan application (ID: %d) has been approved. " +
-		"You can login to check your installment schedule and applications." +
-		"Thank you for your attention.\n\n" +
-		"Best regards,\n" +
-		"Your Loan Management Team"
-
+        Dear %s
+		Congratulations! Your loan application (ID: %d) has been approved.
+		You can login to check your installment schedule and applications.
+		Thank you for your attention.
 
         Best regards,
         Loanleloplis
