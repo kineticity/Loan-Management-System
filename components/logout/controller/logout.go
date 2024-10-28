@@ -38,16 +38,13 @@ func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request
 
 	tokenStr := strings.TrimPrefix(tok, "Bearer ")
 
-	// Check if the token is already blacklisted
 	if middleware.IsTokenBlacklisted(tokenStr) {
 		http.Error(w, "Token has already been invalidated", http.StatusUnauthorized)
 		return
 	}
 
-	// Parse the token
 	claims := &userclaims.UserClaims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-		// Validate the token's signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
@@ -68,7 +65,6 @@ func (lc *LogoutController) LogoutHandler(w http.ResponseWriter, r *http.Request
 
 	middleware.BlacklistToken(tokenStr)
 
-	// Update the logout information in logininfo
 	if err := lc.LogoutService.UpdateLoginInfo(user); err != nil {
 		http.Error(w, "Failed to update logout info", http.StatusInternalServerError)
 		return

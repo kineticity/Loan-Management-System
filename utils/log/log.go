@@ -10,9 +10,7 @@ type Logger interface {
 type Log struct {
 }
 
-//logrus
 func (l *Log) Info(value ...interface{}) {
-	//operations...
 	fmt.Println("<<<<<<<<<<<INFO<<<<<<<<<")
 	fmt.Println(value...)
 	fmt.Println("<<<<<<<<<<<INFO<<<<<<<<<")

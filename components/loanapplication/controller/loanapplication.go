@@ -36,9 +36,6 @@ func (c *LoanApplicationController) RegisterRoutes(router *mux.Router) {
 	loanAppRouter.HandleFunc("/{id}/pay", c.PayInstallment).Methods(http.MethodPut)
 }
 
-// LoanApplicationController.go
-
-// ApplyForLoanWithPersonalDocuments handles the initial loan application with personal documents.
 func (c *LoanApplicationController) ApplyForLoanWithPersonalDocuments(w http.ResponseWriter, r *http.Request) {
 	c.log.Info("ApplyForLoanWithPersonalDocuments called")
 
@@ -54,7 +51,6 @@ func (c *LoanApplicationController) ApplyForLoanWithPersonalDocuments(w http.Res
 		return
 	}
 
-	// Parse loan scheme ID and amount
 	loanSchemeIDStr := r.FormValue("loan_scheme_id")
 	amountStr := r.FormValue("amount")
 	loanSchemeID, amount, err := parseLoanSchemeAndAmount(loanSchemeIDStr, amountStr)
@@ -83,13 +79,11 @@ func (c *LoanApplicationController) ApplyForLoanWithPersonalDocuments(w http.Res
 	})
 }
 func parseLoanSchemeAndAmount(loanSchemeIDStr, amountStr string) (uint, float64, error) {
-	// Parse loanSchemeID
 	loanSchemeID, err := strconv.Atoi(loanSchemeIDStr)
 	if err != nil {
 		return 0, 0, errors.New("invalid loan scheme ID")
 	}
 
-	// Parse amount
 	amount, err := strconv.ParseFloat(amountStr, 64)
 	if err != nil || amount <= 0 {
 		return 0, 0, errors.New("invalid loan amount")
@@ -98,7 +92,6 @@ func parseLoanSchemeAndAmount(loanSchemeIDStr, amountStr string) (uint, float64,
 	return uint(loanSchemeID), amount, nil
 }
 
-// UploadCollateralDocuments allows customers to upload collateral documents for an approved loan.
 func (c *LoanApplicationController) UploadCollateralDocuments(w http.ResponseWriter, r *http.Request) {
 	c.log.Info("UploadCollateralDocuments called")
 
@@ -133,7 +126,6 @@ func (c *LoanApplicationController) UploadCollateralDocuments(w http.ResponseWri
 
 func (c *LoanApplicationController) GetCustomerLoanApplications(w http.ResponseWriter, r *http.Request) {
 	c.log.Info("GetCustomerLoanApplications called")
-	//customer only authorized to get own applications
 	customerID, err := web.GetUserIDFromContext(r)
 	if err != nil {
 		c.log.Error("Unauthorized access: ", err)
@@ -161,7 +153,6 @@ func (c *LoanApplicationController) PayInstallment(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Parse and validate loan application ID from route parameters
 	vars := mux.Vars(r)
 	loanAppID, err := strconv.ParseUint(vars["id"], 10, 32)
 	if err != nil {
@@ -170,7 +161,6 @@ func (c *LoanApplicationController) PayInstallment(w http.ResponseWriter, r *htt
 		return
 	}
 
-	// Call the service to process payment for the nearest due installment
 	err = c.LoanAppService.PayInstallment(uint(customerID), uint(loanAppID))
 	if err != nil {
 		c.log.Error("Error processing installment payment: ", err)

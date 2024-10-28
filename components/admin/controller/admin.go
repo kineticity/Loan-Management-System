@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -57,8 +58,15 @@ func (a *AdminController) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 		web.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
-
-	newAdmin.Role = "Admin" //<----------------------------------------------------------------------added
+	hashedPassword, err := middleware.HashPassword(newAdmin.User.Password)
+	fmt.Println(hashedPassword)
+	if err != nil {
+		a.log.Error("Hashing error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	newAdmin.User.Password = hashedPassword
+	newAdmin.Role = "Admin"
 
 	if err := a.AdminService.CreateAdmin(&newAdmin); err != nil {
 		a.log.Error("Error creating admin: ", err)
@@ -102,11 +110,9 @@ func validateAdmin(admin user.Admin) error {
 func (a *AdminController) GetStatistics(w http.ResponseWriter, r *http.Request) {
 	a.log.Info("GetStatistics called")
 
-	// Parse time range from query parameters
 	startDateStr := r.URL.Query().Get("start_date")
 	endDateStr := r.URL.Query().Get("end_date")
 
-	// Validate dates
 	startDate, err := time.Parse("2006-01-02", startDateStr)
 	if err != nil {
 		web.RespondWithError(w, http.StatusBadRequest, "Invalid start date format, use YYYY-MM-DD")
@@ -118,7 +124,6 @@ func (a *AdminController) GetStatistics(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Fetch statistics from the service
 	stats, err := a.AdminService.GetStatistics(startDate, endDate)
 	if err != nil {
 		a.log.Error("Error fetching statistics: ", err)
@@ -126,6 +131,5 @@ func (a *AdminController) GetStatistics(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Respond with the statistics
 	web.RespondWithJSON(w, http.StatusOK, stats)
 }

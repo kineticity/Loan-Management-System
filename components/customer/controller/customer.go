@@ -33,11 +33,9 @@ func (c *CustomerController) RegisterRoutes(router *mux.Router) {
 	customerRouter.HandleFunc("/update", c.UpdateCustomer).Methods(http.MethodPut)
 }
 
-// update
 func (c *CustomerController) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
 	c.log.Info("UpdateCustomer called")
 
-	// Get logged in customer's ID
 	customerID, err := web.GetUserIDFromContext(r)
 	if err != nil {
 		c.log.Error("Unauthorized access: ", err)
@@ -65,6 +63,16 @@ func (c *CustomerController) UpdateCustomer(w http.ResponseWriter, r *http.Reque
 	if updatedCustomer.Email != "" {
 		existingCustomer.Email = updatedCustomer.Email
 	}
+	if updatedCustomer.Password != "" {
+		hashedPassword, err := middleware.HashPassword(updatedCustomer.Password)
+		if err != nil {
+			c.log.Error("Hashing error: ", err)
+			web.RespondWithError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		existingCustomer.Password = hashedPassword
+	}
 
 	if err := validation.ValidateEmail(updatedCustomer.Email); err != nil {
 		c.log.Error("Email Validation error: ", err)
@@ -72,7 +80,6 @@ func (c *CustomerController) UpdateCustomer(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Save updates
 	if err := c.CustomerService.UpdateCustomer(existingCustomer); err != nil {
 		c.log.Error("Error updating customer: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not update customer")

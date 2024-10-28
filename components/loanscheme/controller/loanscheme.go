@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"loanApp/app"
@@ -45,14 +46,9 @@ func (c *LoanSchemeController) CreateLoanScheme(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	if newScheme.Tenure < 3 {
-		c.log.Error("invalid loan scheme tenure: must be minimum 3 months")
-		web.RespondWithError(w, http.StatusBadRequest, "Invalid input")
-		return
-	}
-	if newScheme.InterestRate <= 0 {
-		c.log.Error("invalid loan scheme interest rate: must be greater than zero")
-		web.RespondWithError(w, http.StatusBadRequest, "Invalid input")
+	if err := validateLoanScheme(&newScheme); err != nil {
+		c.log.Error("Invalid input values: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "Invalid input values")
 		return
 	}
 
@@ -64,7 +60,7 @@ func (c *LoanSchemeController) CreateLoanScheme(w http.ResponseWriter, r *http.R
 	}
 
 	var admin *user.Admin
-	for _, a := range app.AllAdmins { //get scheme creator adminid
+	for _, a := range app.AllAdmins {
 		if a.ID == userID {
 			admin = a
 			break
@@ -123,8 +119,6 @@ func (c *LoanSchemeController) UpdateLoanScheme(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	//remove if all admin can edit all scheme
-
 	var admin *user.Admin
 	for _, a := range app.AllAdmins {
 		if a.ID == userID {
@@ -135,6 +129,12 @@ func (c *LoanSchemeController) UpdateLoanScheme(w http.ResponseWriter, r *http.R
 	if admin == nil {
 		c.log.Error("Admin user not found")
 		web.RespondWithError(w, http.StatusForbidden, "Admin privileges required")
+		return
+	}
+
+	if err := validateLoanScheme(&updatedScheme); err != nil {
+		c.log.Error("Invalid input values: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "Invalid input values")
 		return
 	}
 
@@ -160,4 +160,20 @@ func (c *LoanSchemeController) DeleteLoanScheme(w http.ResponseWriter, r *http.R
 	}
 
 	web.RespondWithJSON(w, http.StatusOK, "Loan scheme deleted successfully")
+}
+
+func validateLoanScheme(scheme *loanscheme.LoanScheme) error {
+	if scheme.Name == "" {
+		return errors.New("scheme name cannot be empty")
+	}
+	if scheme.Category == "" || (scheme.Category != "retail" && scheme.Category != "corporate") {
+		return errors.New("category cannot be empty. Should be corporate or retail only")
+	}
+	if scheme.InterestRate <= 0 {
+		return errors.New("interest rate must be greater than zero")
+	}
+	if scheme.Tenure <= 3 {
+		return errors.New("tenure must be greater than three months")
+	}
+	return nil
 }

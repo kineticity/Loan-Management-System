@@ -15,6 +15,6 @@ type LoanScheme struct {
 	CreatedBy            *user.Admin                        `gorm:"not null"`
 	UpdatedBy            []*user.Admin                      `gorm:"not null"`
 	InterestRate         float64                            `gorm:"not null"`
-	Tenure               int                                `gorm:"not null"` //--???
+	Tenure               int                                `gorm:"not null"` //months
 	ApplicationsOfScheme []*loanapplication.LoanApplication `gorm:"foreignKey:LoanSchemeID"`
 }

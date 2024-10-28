@@ -40,13 +40,10 @@ func (c *LoanOfficerController) RegisterRoutes(router *mux.Router) {
 	decisionRouter := router.PathPrefix("/loan-officer/decision").Subrouter()
 	decisionRouter.Use(middleware.TokenAuthMiddleware)
 	decisionRouter.Use(middleware.LoanOfficerOnly)
-	// Route to get all loan applications assigned to the loan officer
 	decisionRouter.HandleFunc("/applications", c.GetAssignedLoanApplications).Methods(http.MethodGet)
 
-	// Route to approve or reject the initial loan application (first step approval)
 	decisionRouter.HandleFunc("/applications/{id}/initial-approval", c.ApproveInitialApplication).Methods(http.MethodPost)
 
-	// Route to approve or reject collateral documents for the loan application (second step approval)
 	decisionRouter.HandleFunc("/applications/{id}/collateral-approval", c.ApproveCollateralDocuments).Methods(http.MethodPost)
 }
 
@@ -80,6 +77,14 @@ func (c *LoanOfficerController) CreateLoanOfficer(w http.ResponseWriter, r *http
 		web.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+
+	hashedPassword, err := middleware.HashPassword(newOfficer.Password)
+	if err != nil {
+		c.log.Error("Hashing error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	newOfficer.Password = hashedPassword
 
 	newOfficer.CreatedByAdminID = admin.ID
 	newOfficer.Role = "Loan Officer"
@@ -143,6 +148,14 @@ func (c *LoanOfficerController) UpdateLoanOfficer(w http.ResponseWriter, r *http
 		return
 	}
 
+	hashedPassword, err := middleware.HashPassword(updatedOfficer.Password)
+	if err != nil {
+		c.log.Error("Hashing error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	updatedOfficer.Password = hashedPassword
+
 	if err := c.LoanOfficerService.UpdateLoanOfficer(officerID, &updatedOfficer); err != nil {
 		c.log.Error("Error updating loan officer: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not update loan officer")
@@ -183,7 +196,6 @@ func (c *LoanOfficerController) GetAssignedLoanApplications(w http.ResponseWrite
 	web.RespondWithJSON(w, http.StatusOK, applications)
 }
 
-// ApproveInitialApplication handles the first approval of the loan application
 func (c *LoanOfficerController) ApproveInitialApplication(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	applicationID := vars["id"]
@@ -214,7 +226,6 @@ func (c *LoanOfficerController) ApproveInitialApplication(w http.ResponseWriter,
 	web.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Application processed successfully"})
 }
 
-// ApproveCollateralDocuments handles approval of collateral documents for the application
 func (c *LoanOfficerController) ApproveCollateralDocuments(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	applicationID := vars["id"]

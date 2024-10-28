@@ -32,7 +32,6 @@ func NewParser(request *http.Request) *Parser {
 
 }
 
-// RespondWithJSON sends a JSON response to the client
 func RespondWithJSON(w http.ResponseWriter, status int, payload interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -41,7 +40,6 @@ func RespondWithJSON(w http.ResponseWriter, status int, payload interface{}) {
 	}
 }
 
-// RespondWithError sends an error response to the client
 func RespondWithError(w http.ResponseWriter, status int, message string) {
 	RespondWithJSON(w, status, map[string]string{"error": message})
 }

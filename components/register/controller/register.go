@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"loanApp/components/customer/service"
+	"loanApp/components/middleware"
 	"loanApp/models/user"
 	"loanApp/utils/log"
 	"loanApp/utils/validation"
@@ -40,6 +41,13 @@ func (rc *RegisterController) RegisterCustomer(w http.ResponseWriter, r *http.Re
 		return
 	}
 	newCustomer.Role = "Customer"
+	hashedPassword, err := middleware.HashPassword(newCustomer.Password)
+	if err != nil {
+		rc.log.Error("Hashing error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	newCustomer.Password = hashedPassword
 
 	if err := validateCustomer(newCustomer); err != nil {
 		rc.log.Error("Validation error: ", err)

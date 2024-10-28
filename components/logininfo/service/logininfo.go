@@ -4,6 +4,7 @@ import (
 	"loanApp/models/logininfo"
 	"loanApp/repository"
 	"loanApp/utils/log"
+
 	// "time"
 
 	"github.com/jinzhu/gorm"
@@ -23,20 +24,19 @@ func NewLoginInfoService(db *gorm.DB, repo repository.Repository, logger log.Log
 	}
 }
 
-func (s *LoginInfoService) CreateLoginInfo(info *logininfo.LoginInfo) (*logininfo.LoginInfo,error) {
+func (s *LoginInfoService) CreateLoginInfo(info *logininfo.LoginInfo) (*logininfo.LoginInfo, error) {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
 	if err := s.repository.Add(uow, info); err != nil {
 		s.log.Error("Error creating login info: ", err)
-		return nil,err
+		return nil, err
 	}
 
 	uow.Commit()
-	return info,nil
+	return info, nil
 }
 
-// UpdateLogoutTime updates the LogoutTime for a specific user
 func (s *LoginInfoService) UpdateLogoutTime(userID uint) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
@@ -47,7 +47,7 @@ func (s *LoginInfoService) UpdateLogoutTime(userID uint) error {
 		return err
 	}
 
-	info.LogoutTime = nil // Set the current time as LogoutTime
+	info.LogoutTime = nil
 	if err := s.repository.Update(uow, &info); err != nil {
 		s.log.Error("Error updating logout time: ", err)
 		return err
@@ -57,7 +57,6 @@ func (s *LoginInfoService) UpdateLogoutTime(userID uint) error {
 	return nil
 }
 
-// GetLoginInfo retrieves the login information for a specific user
 func (s *LoginInfoService) GetLoginInfo(userID uint) (*logininfo.LoginInfo, error) {
 	var info logininfo.LoginInfo
 	if err := s.repository.GetByID(nil, &info, userID); err != nil {

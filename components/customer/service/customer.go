@@ -26,14 +26,13 @@ func (s *CustomerService) CreateCustomer(customer *user.Customer) (*user.Custome
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	err := s.repository.Add(uow, &customer.User) // Add to users
+	err := s.repository.Add(uow, &customer.User)
 	if err != nil {
 		return nil, err
 	}
 
-	// Then use the same User ID to create the Admin
 	customer.ID = customer.User.ID
-	err = s.repository.Add(uow, customer) // Add to customers
+	err = s.repository.Add(uow, customer)
 	if err != nil {
 		return nil, err
 	}

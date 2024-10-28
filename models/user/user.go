@@ -9,7 +9,6 @@ import (
 
 type Role string
 
-// Base User struct -> embed user in admin,loanofficer,customer
 type User struct {
 	gorm.Model
 	Name      string                 `gorm:"not null"`
@@ -23,13 +22,12 @@ type User struct {
 type Admin struct {
 	User
 	LoanOfficers []*LoanOfficer `gorm:"foreignKey:CreatedByAdminID"`
-	// LoanSchemes  []*loanscheme.LoanScheme `gorm:"foreignKey:CreatedByAdminID"`
 }
 
 type LoanOfficer struct {
 	User
-	CreatedByAdminID uint                               //foreign key references admin(id)
-	UpdatedBy        []*Admin                           //later
+	CreatedByAdminID uint //foreign key references admin(id)
+	UpdatedBy        []*Admin
 	AssignedLoans    []*loanapplication.LoanApplication `gorm:"foreignKey:LoanOfficerID"`
 }
 

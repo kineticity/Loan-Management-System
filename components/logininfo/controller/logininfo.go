@@ -32,7 +32,6 @@ func (c *LoginInfoController) RegisterRoutes(router *mux.Router) {
 	loginRouter.HandleFunc("/logout/{userID}", c.UpdateLogoutTime).Methods(http.MethodPut)
 }
 
-// CreateLoginInfo handles the creation of login information
 func (c *LoginInfoController) CreateLoginInfo(w http.ResponseWriter, r *http.Request) {
 	c.log.Info("CreateLoginInfo called")
 
@@ -43,7 +42,7 @@ func (c *LoginInfoController) CreateLoginInfo(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	if _,err := c.LoginInfoService.CreateLoginInfo(&newInfo); err != nil {
+	if _, err := c.LoginInfoService.CreateLoginInfo(&newInfo); err != nil {
 		c.log.Error("Error creating login info: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not create login info")
 		return
@@ -52,7 +51,6 @@ func (c *LoginInfoController) CreateLoginInfo(w http.ResponseWriter, r *http.Req
 	web.RespondWithJSON(w, http.StatusCreated, newInfo)
 }
 
-// UpdateLogoutTime updates the logout time for the given userID
 func (c *LoginInfoController) UpdateLogoutTime(w http.ResponseWriter, r *http.Request) {
 	c.log.Info("UpdateLogoutTime called")
 
@@ -73,7 +71,6 @@ func (c *LoginInfoController) UpdateLogoutTime(w http.ResponseWriter, r *http.Re
 	web.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Logout time updated successfully"})
 }
 
-// GetLoginInfo retrieves the login information for the given userID
 func (c *LoginInfoController) GetLoginInfo(w http.ResponseWriter, r *http.Request) {
 	c.log.Info("GetLoginInfo called")
 

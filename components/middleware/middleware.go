@@ -2,9 +2,12 @@ package middleware
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"loanApp/models/user"
@@ -16,10 +19,15 @@ import (
 
 var SecretKey = []byte("it'sDevthedev")
 
-// SigningToken signs the JWT token with the user information
+func HashPassword(password string) (string, error) {
+	hasher := sha256.New()
+	hasher.Write([]byte(password))
+	return hex.EncodeToString(hasher.Sum(nil)), nil
+}
+
 func SigningToken(u *user.User, expirationTime time.Time) (string, error) {
 	claims := &userclaims.UserClaims{
-		User: *u, // Embed the user struct
+		User: *u,
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: expirationTime.Unix(),
 		},
@@ -29,7 +37,6 @@ func SigningToken(u *user.User, expirationTime time.Time) (string, error) {
 	return token.SignedString(SecretKey)
 }
 
-// TokenAuthMiddleware checks the JWT token in the Authorization header
 func TokenAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -55,7 +62,6 @@ func TokenAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// VerifyJWT verifies the token and extracts the claims
 func VerifyJWT(tokenStr string) (*userclaims.UserClaims, error) {
 	claims := &userclaims.UserClaims{}
 	token, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
@@ -70,7 +76,6 @@ func VerifyJWT(tokenStr string) (*userclaims.UserClaims, error) {
 	return claims, nil
 }
 
-// AdminOnly middleware restricts access to admins only
 func AdminOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := r.Context().Value("claims").(*userclaims.UserClaims)
@@ -88,7 +93,6 @@ func AdminOnly(next http.Handler) http.Handler {
 	})
 }
 
-// CustomerOnly middleware restricts access to customers only
 func CustomerOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := r.Context().Value("claims").(*userclaims.UserClaims)
@@ -106,7 +110,6 @@ func CustomerOnly(next http.Handler) http.Handler {
 	})
 }
 
-// CustomerOnly middleware restricts access to customers only
 func LoanOfficerOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := r.Context().Value("claims").(*userclaims.UserClaims)
@@ -122,4 +125,22 @@ func LoanOfficerOnly(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+var (
+	blacklistedTokens = make(map[string]struct{})
+	mu                sync.Mutex
+)
+
+func BlacklistToken(token string) {
+	mu.Lock()
+	defer mu.Unlock()
+	blacklistedTokens[token] = struct{}{}
+}
+
+func IsTokenBlacklisted(token string) bool {
+	mu.Lock()
+	defer mu.Unlock()
+	_, exists := blacklistedTokens[token]
+	return exists
 }

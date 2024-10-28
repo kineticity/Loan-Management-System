@@ -46,13 +46,11 @@ func (l *LogoutService) UpdateLoginInfo(user *user.User) error {
 
 	logininfo.LogoutTime = &now
 
-	// Update logininfo
 	err = l.repository.Update(uow, logininfo)
 	if err != nil {
 		return err
 	}
 
-	// Update users
 	if err := l.repository.Update(uow, user); err != nil {
 		return err
 	}

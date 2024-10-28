@@ -26,7 +26,6 @@ var AllLoanOfficers []*user.LoanOfficer
 var AllCustomers []*user.Customer
 var AllLoanSchemes []*loanscheme.LoanScheme
 
-// Define the roles as constants
 const (
 	Admin       user.Role = "Admin"
 	LoanOfficer user.Role = "Loan Officer"
@@ -124,7 +123,6 @@ func (a *App) StopServer() {
 	fmt.Println("Server shut down gracefully")
 }
 
-// ClearDatabase for TESTING
 func ClearDatabase() {
 	db, err := gorm.Open("mysql", "root:Bank1mbha!Bank1mbha!@/LoanManagementSystem?charset=utf8&parseTime=True&loc=Local")
 	if err != nil {

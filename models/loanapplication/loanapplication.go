@@ -11,8 +11,8 @@ import (
 type LoanApplication struct {
 	gorm.Model
 	LoanSchemeID    uint                         `gorm:"not null"` //int->uint //foreign key references loanschemes(id)
-	CustomerID      uint                         `gorm:"not null"` //foreign key references customers(id)
-	LoanOfficerID   uint                         `gorm:"not null"` //change back to not null later //foreign key references loanofficer(id)
+	CustomerID      uint                         `gorm:"not null"`
+	LoanOfficerID   uint                         `gorm:"not null"`
 	ApplicationDate time.Time                    `gorm:"default:CURRENT_TIMESTAMP"`
 	DecisionDate    *time.Time                   `gorm:"nullable"`
 	Status          string                       `gorm:"not null"`

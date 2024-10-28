@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"loanApp/models/loanscheme"
 	"loanApp/repository"
 	"loanApp/utils/log"
@@ -29,10 +28,6 @@ func (s *LoanSchemeService) CreateLoanScheme(scheme *loanscheme.LoanScheme) erro
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	if err := validateLoanScheme(scheme); err != nil {
-		return err
-	}
-
 	err := s.repository.Add(uow, scheme)
 	if err != nil {
 		return err
@@ -57,8 +52,7 @@ func (s *LoanSchemeService) GetAllLoanSchemes(allSchemes *[]*loanscheme.LoanSche
 	}
 
 	queryProcessors := []repository.QueryProcessor{
-		// s.repository.Preload("CreatedBy"),
-		// s.repository.Preload("UpdatedBy"),
+
 		s.repository.Limit(limit),
 		s.repository.Offset(offset),
 	}
@@ -108,21 +102,5 @@ func (s *LoanSchemeService) DeleteLoanScheme(id string) error {
 	}
 
 	uow.Commit()
-	return nil
-}
-
-func validateLoanScheme(scheme *loanscheme.LoanScheme) error {
-	if scheme.Name == "" {
-		return errors.New("scheme name cannot be empty")
-	}
-	if scheme.Category == ""|| (scheme.Category!="retail"&&scheme.Category!="corporate") {
-		return errors.New("category cannot be empty. Should be corporate or retail only")
-	}
-	if scheme.InterestRate <= 0 {
-		return errors.New("interest rate must be greater than zero")
-	}
-	if scheme.Tenure <= 0 {
-		return errors.New("tenure must be greater than zero")
-	}
 	return nil
 }

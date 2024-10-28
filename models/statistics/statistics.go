@@ -12,11 +12,11 @@ type Statistics struct {
 type LoanSchemeStats struct {
 	SchemeID                   uint `json:"scheme_id"`
 	ApplicationCount           uint `json:"application_count"`
-	NonPerformingAssetInScheme uint `json:"non_performing_asset_in_scheme"` // Total NPAs for this loan scheme
+	NonPerformingAssetInScheme uint `json:"non_performing_asset_in_scheme"`
 }
 
 type LoanOfficerStats struct {
 	OfficerID                     uint `json:"officer_id"`
 	ApplicationCount              uint `json:"application_count"`
-	NonPerformingAssetFromOfficer uint `json:"non_performing_asset_from_officer"` // Total NPAs for loans handled by this officer
+	NonPerformingAssetFromOfficer uint `json:"non_performing_asset_from_officer"`
 }

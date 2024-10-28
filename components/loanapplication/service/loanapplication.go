@@ -39,10 +39,7 @@ func NewLoanApplicationService(db *gorm.DB, repository repository.Repository, lo
 	}
 }
 
-// local folder for documents
 const DocumentUploadDir = "C:\\Users\\Dev.patel\\Downloads\\4 Loan Management System 27th mail_pay_npa\\4 Loan Management System\\upload"
-
-// LoanApplicationService.go
 
 func (s *LoanApplicationService) GetLoanApplicationsByCustomer(customerID uint, applications *[]loanapplication.LoanApplication) error {
 	uow := repository.NewUnitOfWork(s.DB)
@@ -50,7 +47,6 @@ func (s *LoanApplicationService) GetLoanApplicationsByCustomer(customerID uint, 
 
 	queryProcessors := []repository.QueryProcessor{
 		s.repository.Filter("customer_id = ?", customerID),
-		// s.repository.Preload("Installations"), //uncomment later
 		s.repository.Preload("Documents"),
 		s.repository.Preload("Installations"),
 	}
@@ -63,12 +59,10 @@ func (s *LoanApplicationService) GetLoanApplicationsByCustomer(customerID uint, 
 	return nil
 }
 
-// ApplyForLoan creates a new loan application with personal documents.
 func (s *LoanApplicationService) ApplyForLoan(customerID uint, loanSchemeID uint, amount float64, files []*multipart.FileHeader) (uint, error) {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	// Check for existing pending applications
 	var count int64
 	err := s.DB.Model(&loanapplication.LoanApplication{}).
 		Where("customer_id = ? AND status IN (?, ?, ?)", customerID, "Pending", "PendingCollateral", "Collateral Uploaded").
@@ -77,12 +71,10 @@ func (s *LoanApplicationService) ApplyForLoan(customerID uint, loanSchemeID uint
 		return 0, fmt.Errorf("failed to check existing applications: %w", err)
 	}
 
-	// Ensure the user does not exceed the application limit
-	if count > 3 {
+	if count >= 3 {
 		return 0, fmt.Errorf("user can only have up to 3 pending loan applications at a time")
 	}
 
-	// Create Loan Application
 	application := loanapplication.LoanApplication{
 		CustomerID:      customerID,
 		LoanSchemeID:    loanSchemeID,
@@ -91,7 +83,6 @@ func (s *LoanApplicationService) ApplyForLoan(customerID uint, loanSchemeID uint
 		ApplicationDate: time.Now(),
 	}
 
-	// Find the least loaded officer to assign the application
 	officer, err := s.LoanOfficerService.GetLeastLoadedOfficer()
 	if err != nil {
 		return 0, err
@@ -102,7 +93,6 @@ func (s *LoanApplicationService) ApplyForLoan(customerID uint, loanSchemeID uint
 		return 0, err
 	}
 
-	// Save personal documents
 	for _, fileHeader := range files {
 		doc, err := s.saveDocument(fileHeader, "personal_documents", application.ID)
 		if err != nil {
@@ -117,24 +107,20 @@ func (s *LoanApplicationService) ApplyForLoan(customerID uint, loanSchemeID uint
 	return application.ID, nil
 }
 
-// UploadCollateralDocuments allows uploading of collateral documents if the loan application is approved.
 func (s *LoanApplicationService) UploadCollateralDocuments(applicationID string, customerID uint, files []*multipart.FileHeader) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	// Check if the application is approved and belongs to the customer
 	canUpload, err := s.CanUploadCollateral(applicationID, customerID)
 	if err != nil || !canUpload {
 		return err
 	}
 
-	// Retrieve the loan application
 	var application loanapplication.LoanApplication
 	if err := s.repository.GetByID(uow, &application, applicationID); err != nil {
 		return fmt.Errorf("failed to retrieve application: %w", err)
 	}
 
-	// Save collateral documents
 	for _, fileHeader := range files {
 		doc, err := s.saveDocument(fileHeader, "collateral_documents", application.ID)
 		if err != nil {
@@ -154,7 +140,6 @@ func (s *LoanApplicationService) UploadCollateralDocuments(applicationID string,
 	return nil
 }
 
-// CanUploadCollateral checks if the collateral documents can be uploaded for a specific application.
 func (s *LoanApplicationService) CanUploadCollateral(applicationID string, customerID uint) (bool, error) {
 	var application loanapplication.LoanApplication
 	uow := repository.NewUnitOfWork(s.DB)
@@ -175,7 +160,6 @@ func (s *LoanApplicationService) CanUploadCollateral(applicationID string, custo
 	return application.Status == "Approved", nil
 }
 
-// saveDocument handles file saving and returns the Document model.
 func (s *LoanApplicationService) saveDocument(fileHeader *multipart.FileHeader, docType string, applicationID uint) (*document.Document, error) {
 	file, err := fileHeader.Open()
 	if err != nil {
@@ -233,11 +217,10 @@ func (s *LoanApplicationService) PayInstallment(customerID, loanApplicationID ui
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	// Find the installment with the nearest due date that is unpaid
 	var installment installation.Installation
 	err := s.repository.GetAll(uow, &installment,
 		s.repository.Filter("loan_application_id = ? AND status = ?", loanApplicationID, "Pending"),
-		s.repository.OrderBy("due_date ASC"), // Order by due date in ascending order
+		s.repository.OrderBy("due_date ASC"),
 		s.repository.Limit(1),
 	)
 	if err != nil || installment.ID == 0 {
@@ -256,12 +239,10 @@ func (s *LoanApplicationService) PayInstallment(customerID, loanApplicationID ui
 
 	}
 
-	// Update the installment as paid
 	installment.Status = "Paid"
 	now := time.Now()
 	installment.PaymentDate = &now
 
-	// Save the updated installment
 	if err := s.repository.Update(uow, &installment); err != nil {
 		return errors.New("failed to update installment payment status")
 	}
@@ -270,15 +251,12 @@ func (s *LoanApplicationService) PayInstallment(customerID, loanApplicationID ui
 	return nil
 }
 
-// CheckForNPA checks loan applications for Non-Performing Asset (NPA) status
 func (s *LoanApplicationService) CheckForNPA() error {
 	var applications []loanapplication.LoanApplication
 
-	// Start a new Unit of Work
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	// Get all active loan applications
 	if err := s.repository.GetAll(uow, &applications); err != nil {
 		return fmt.Errorf("failed to fetch loan applications: %w", err)
 	}
@@ -286,7 +264,6 @@ func (s *LoanApplicationService) CheckForNPA() error {
 	now := time.Now()
 
 	for _, app := range applications {
-		// Fetch the last three "Pending" installments with due dates before the current time for each application
 		var installments []installation.Installation
 		err := s.repository.GetAll(uow, &installments,
 			s.repository.Filter("loan_application_id = ?", app.ID),
@@ -300,7 +277,6 @@ func (s *LoanApplicationService) CheckForNPA() error {
 			return fmt.Errorf("failed to fetch installments: %w", err)
 		}
 
-		// Check if all fetched installments are overdue
 		overdueCount := 0
 		for _, inst := range installments {
 			if inst.DueDate.Before(now) && inst.Status == "Pending" {
@@ -308,7 +284,6 @@ func (s *LoanApplicationService) CheckForNPA() error {
 			}
 		}
 
-		// Mark as NPA if all three fetched installments are overdue
 		if overdueCount == 3 && !app.IsNPA {
 			app.IsNPA = true
 			if err := s.repository.Update(uow, &app); err != nil {
@@ -317,7 +292,6 @@ func (s *LoanApplicationService) CheckForNPA() error {
 		}
 	}
 
-	// Commit changes
 	uow.Commit()
 	return nil
 }
@@ -335,14 +309,12 @@ func ScheduleNPAStatusCheck(service *LoanApplicationService) {
 	}()
 }
 
-// ScheduleReminders fetches installments due in 2 days and sends reminder emails
 func ScheduleReminders(s *LoanApplicationService) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	// Define due date range for 2 days from now
-	dueDate := time.Now() //due today checking rn change later to 2 days from now
-	//.AddDate(0, 0, 2) // 2 days from now
+	dueDate := time.Now()
+
 	startOfDay := time.Date(dueDate.Year(), dueDate.Month(), dueDate.Day(), 0, 0, 0, 0, dueDate.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
@@ -355,7 +327,6 @@ func ScheduleReminders(s *LoanApplicationService) error {
 		return fmt.Errorf("failed to fetch due installments: %w", err)
 	}
 
-	// Send reminder email for each installment
 	for _, installment := range installments {
 		if err := s.sendReminderEmail(installment); err != nil {
 			fmt.Printf("failed to send reminder for installment %d: %v\n", installment.ID, err)
@@ -365,13 +336,11 @@ func ScheduleReminders(s *LoanApplicationService) error {
 	return nil
 }
 
-// sendReminderEmail composes and sends a reminder email using gomail and Gmail SMTP
 func (s *LoanApplicationService) sendReminderEmail(installment installation.Installation) error {
-	// Fetch customer details associated with the installment
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 	var customer user.Customer
-	fmt.Println("senreminderemail")
+	fmt.Println("send reminder email")
 	var loanapplication loanapplication.LoanApplication
 	err := s.repository.GetByID(uow, &loanapplication, installment.LoanApplicationID)
 	if err != nil {
@@ -381,7 +350,6 @@ func (s *LoanApplicationService) sendReminderEmail(installment installation.Inst
 		return fmt.Errorf("failed to fetch customer: %w", err)
 	}
 
-	// Email content
 	subject := "Loan Payment Reminder"
 	message := fmt.Sprintf(`
         Dear %s,
@@ -399,17 +367,14 @@ func (s *LoanApplicationService) sendReminderEmail(installment installation.Inst
         Loanleloplis
     `, customer.Name, installment.AmountToBePaid, installment.DueDate.Format("2006-01-02"), installment.LoanApplicationID, installment.AmountToBePaid, installment.DueDate.Format("2006-01-02"))
 
-	// Configure email settings using gomail
 	m := gomail.NewMessage()
 	m.SetHeader("From", "kierarieger2@gmail.com")
 	m.SetHeader("To", customer.Email)
 	m.SetHeader("Subject", subject)
 	m.SetBody("text/plain", message)
 
-	// Set up the Gmail SMTP server
-	d := gomail.NewDialer("smtp.gmail.com", 587, "kierarieger2@gmail.com", "rttw twcm ponf rbtd") //<---------mera fake email and password lol
+	d := gomail.NewDialer("smtp.gmail.com", 587, "kierarieger2@gmail.com", "rttw twcm ponf rbtd")
 
-	// Send email
 	if err := d.DialAndSend(m); err != nil {
 		return fmt.Errorf("failed to send email: %w", err)
 	}
@@ -417,7 +382,6 @@ func (s *LoanApplicationService) sendReminderEmail(installment installation.Inst
 	return nil
 }
 
-// StartReminderScheduler starts a goroutine to schedule reminders at midnight and repeat every 24 hours
 func StartReminderScheduler(s *LoanApplicationService) {
 	// now := time.Now()
 	// nextMidnight := now.Truncate(24 * time.Hour).Add(24 * time.Hour)
@@ -425,12 +389,12 @@ func StartReminderScheduler(s *LoanApplicationService) {
 
 	// Start a goroutine to wait until midnight, then run every 24 hours
 	go func() {
-		time.Sleep(2 * time.Minute) //every 2 min currently
 		for {
 			if err := ScheduleReminders(s); err != nil {
 				log.GetLogger().Error("Error scheduling reminders: %v", err)
 			}
-			time.Sleep(24 * time.Hour) // Sleep for 24 hours
+			time.Sleep(2 * time.Minute) //every 2 min currently
+			// time.Sleep(24 * time.Hour) // Sleep for 24 hours
 		}
 	}()
 }

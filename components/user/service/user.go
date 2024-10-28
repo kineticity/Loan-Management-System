@@ -7,7 +7,6 @@ import (
 	"loanApp/utils/log"
 
 	"github.com/jinzhu/gorm"
-	// "golang.org/x/crypto/bcrypt" 
 )
 
 type UserService struct {
@@ -23,7 +22,7 @@ func (u *UserService) GetUserByEmail(email string) (*user.User, error) {
 		if gorm.IsRecordNotFoundError(err) {
 			return nil, errors.New("user not found")
 		}
-		return nil, err 
+		return nil, err
 	}
 	return &foundUser, nil
 }
@@ -31,7 +30,7 @@ func (u *UserService) GetUserByEmail(email string) (*user.User, error) {
 func (u *UserService) AuthenticateUser(email, password string) (*user.User, error) {
 	foundUser, err := u.GetUserByEmail(email)
 	if err != nil {
-		return nil, err 
+		return nil, err
 	}
 
 	if foundUser.Password != password {
