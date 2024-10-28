@@ -32,7 +32,7 @@ func (s *CustomerService) CreateCustomer(customer *user.Customer) (*user.Custome
 	}
 
 	// Then use the same User ID to create the Admin
-	customer.ID = customer.User.ID        
+	customer.ID = customer.User.ID
 	err = s.repository.Add(uow, customer) // Add to customers
 	if err != nil {
 		return nil, err
@@ -68,22 +68,3 @@ func (s *CustomerService) GetCustomerByID(customerID uint) (*user.Customer, erro
 
 	return &customer, nil
 }
-
-// func (s *CustomerService) DeleteCustomer(customerID uint) error {
-// 	uow := repository.NewUnitOfWork(s.DB)
-// 	defer uow.RollBack()
-
-// 	var customer user.Customer
-// 	if err := s.repository.GetByID(uow, &customer, customerID); err != nil {
-// 		s.log.Error("Error fetching customer: ", err)
-// 		return err
-// 	}
-
-// 	if err := s.repository.Delete(uow, &customer); err != nil {
-// 		s.log.Error("Error deleting customer: ", err)
-// 		return err
-// 	}
-
-// 	uow.Commit()
-// 	return nil
-// }

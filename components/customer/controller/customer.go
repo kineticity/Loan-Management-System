@@ -8,6 +8,7 @@ import (
 	"loanApp/components/middleware"
 	"loanApp/models/user"
 	"loanApp/utils/log"
+	"loanApp/utils/validation"
 	"loanApp/utils/web"
 
 	"github.com/gorilla/mux"
@@ -63,6 +64,12 @@ func (c *CustomerController) UpdateCustomer(w http.ResponseWriter, r *http.Reque
 	}
 	if updatedCustomer.Email != "" {
 		existingCustomer.Email = updatedCustomer.Email
+	}
+
+	if err := validation.ValidateEmail(updatedCustomer.Email); err != nil {
+		c.log.Error("Email Validation error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
 	}
 
 	// Save updates

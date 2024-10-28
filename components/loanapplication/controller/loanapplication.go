@@ -1,16 +1,12 @@
 package controller
 
 import (
-	"io"
+	"errors"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strconv"
-	"time"
 
 	"loanApp/components/loanapplication/service"
 	"loanApp/components/middleware"
-	"loanApp/models/document"
 	"loanApp/models/loanapplication"
 	"loanApp/utils/log"
 	"loanApp/utils/web"
@@ -29,20 +25,22 @@ func NewLoanApplicationController(loanAppService *service.LoanApplicationService
 		log:            log,
 	}
 }
-
 func (c *LoanApplicationController) RegisterRoutes(router *mux.Router) {
 	loanAppRouter := router.PathPrefix("/loan-applications").Subrouter()
 	loanAppRouter.Use(middleware.TokenAuthMiddleware)
 	loanAppRouter.Use(middleware.CustomerOnly)
-	loanAppRouter.HandleFunc("", c.CreateLoanApplicationWithDocs).Methods(http.MethodPost)
-	loanAppRouter.HandleFunc("", c.GetCustomerLoanApplications).Methods(http.MethodGet)
-	loanAppRouter.HandleFunc("/{id}/pay", c.PayInstallment).Methods(http.MethodPut) //just put link no requestbody for pay
 
+	loanAppRouter.HandleFunc("", c.ApplyForLoanWithPersonalDocuments).Methods(http.MethodPost)
+	loanAppRouter.HandleFunc("", c.GetCustomerLoanApplications).Methods(http.MethodGet)
+	loanAppRouter.HandleFunc("/{id}/upload-collateral-docs", c.UploadCollateralDocuments).Methods(http.MethodPost)
+	loanAppRouter.HandleFunc("/{id}/pay", c.PayInstallment).Methods(http.MethodPut)
 }
 
-// todo: loan officer assign with minimum load , loanschemeid verify
-func (c *LoanApplicationController) CreateLoanApplicationWithDocs(w http.ResponseWriter, r *http.Request) {
-	c.log.Info("CreateLoanApplicationWithDocs called")
+// LoanApplicationController.go
+
+// ApplyForLoanWithPersonalDocuments handles the initial loan application with personal documents.
+func (c *LoanApplicationController) ApplyForLoanWithPersonalDocuments(w http.ResponseWriter, r *http.Request) {
+	c.log.Info("ApplyForLoanWithPersonalDocuments called")
 
 	if err := r.ParseMultipartForm(10 << 20); err != nil { // Limit to 10MB
 		web.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
@@ -56,78 +54,81 @@ func (c *LoanApplicationController) CreateLoanApplicationWithDocs(w http.Respons
 		return
 	}
 
+	// Parse loan scheme ID and amount
 	loanSchemeIDStr := r.FormValue("loan_scheme_id")
-	loanSchemeID64, err := strconv.ParseUint(loanSchemeIDStr, 10, 32)
-	if err != nil {
-		c.log.Error("Invalid loan_scheme_id: ", err)
-		web.RespondWithError(w, http.StatusBadRequest, "Invalid loan scheme ID")
-		return
-	}
-	loanSchemeID := uint(loanSchemeID64)
-
 	amountStr := r.FormValue("amount")
-	amount, err := strconv.ParseFloat(amountStr, 64)
+	loanSchemeID, amount, err := parseLoanSchemeAndAmount(loanSchemeIDStr, amountStr)
 	if err != nil {
-		c.log.Error("Invalid amount: ", err)
-		web.RespondWithError(w, http.StatusBadRequest, "Invalid amount")
+		c.log.Error("Invalid loan scheme ID or amount: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	application := loanapplication.LoanApplication{
-		CustomerID:      customerID,
-		Status:          "Pending",
-		Amount:          amount,
-		LoanSchemeID:    loanSchemeID,
-		ApplicationDate: time.Now(),
-		IsNPA:           false,
-	}
-
-	//todo: make separate keys for documents, chanfe filename/path to include user id,loan app id
-	var documents []*document.Document
-	files := r.MultipartForm.File["documents"] // key=documents
+	files := r.MultipartForm.File["personal_documents"]
 	if len(files) == 0 {
-		c.log.Error("No documents provided")
-		web.RespondWithError(w, http.StatusBadRequest, "No documents provided")
+		web.RespondWithError(w, http.StatusBadRequest, "No personal documents provided")
 		return
 	}
-	c.log.Info("Number of documents received: ", len(files))
 
-	for _, fileHeader := range files {
-		file, err := fileHeader.Open()
-		if err != nil {
-			c.log.Error("Error opening file: ", err)
-			continue
-		}
-		defer file.Close()
-
-		fileName := fileHeader.Filename
-		filePath := filepath.Join(service.DocumentUploadDir, fileName)
-
-		dst, err := os.Create(filePath) //creates a file in path
-		if err != nil {
-			c.log.Error("Error saving file: ", err)
-			continue
-		}
-		defer dst.Close()
-		if _, err := io.Copy(dst, file); err != nil { //copies file content to created file
-			c.log.Error("Error copying file: ", err)
-			continue
-		}
-
-		doc := &document.Document{
-			DocumentType: fileHeader.Header.Get("Content-Type"),
-			URL:          filePath,
-		}
-		documents = append(documents, doc)
-	}
-
-	if err := c.LoanAppService.CreateLoanApplicationWithDocs(&application, documents); err != nil {
+	applicationID, err := c.LoanAppService.ApplyForLoan(customerID, loanSchemeID, amount, files)
+	if err != nil {
 		c.log.Error("Error creating loan application: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not create loan application")
 		return
 	}
 
-	web.RespondWithJSON(w, http.StatusCreated, application)
+	web.RespondWithJSON(w, http.StatusCreated, map[string]interface{}{
+		"message":       "Loan application created successfully",
+		"applicationID": applicationID,
+	})
+}
+func parseLoanSchemeAndAmount(loanSchemeIDStr, amountStr string) (uint, float64, error) {
+	// Parse loanSchemeID
+	loanSchemeID, err := strconv.Atoi(loanSchemeIDStr)
+	if err != nil {
+		return 0, 0, errors.New("invalid loan scheme ID")
+	}
+
+	// Parse amount
+	amount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil || amount <= 0 {
+		return 0, 0, errors.New("invalid loan amount")
+	}
+
+	return uint(loanSchemeID), amount, nil
+}
+
+// UploadCollateralDocuments allows customers to upload collateral documents for an approved loan.
+func (c *LoanApplicationController) UploadCollateralDocuments(w http.ResponseWriter, r *http.Request) {
+	c.log.Info("UploadCollateralDocuments called")
+
+	applicationID := mux.Vars(r)["id"]
+	customerID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("Unauthorized access: ", err)
+		web.RespondWithError(w, http.StatusUnauthorized, "Unauthorized access")
+		return
+	}
+
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		web.RespondWithError(w, http.StatusBadRequest, "Invalid request payload")
+		return
+	}
+
+	files := r.MultipartForm.File["collateral_documents"]
+	if len(files) == 0 {
+		web.RespondWithError(w, http.StatusBadRequest, "No collateral documents provided")
+		return
+	}
+
+	err = c.LoanAppService.UploadCollateralDocuments(applicationID, customerID, files)
+	if err != nil {
+		c.log.Error("Error uploading collateral documents: ", err)
+		web.RespondWithError(w, http.StatusInternalServerError, "Could not upload collateral documents")
+		return
+	}
+
+	web.RespondWithJSON(w, http.StatusOK, "Collateral documents uploaded successfully")
 }
 
 func (c *LoanApplicationController) GetCustomerLoanApplications(w http.ResponseWriter, r *http.Request) {
@@ -179,4 +180,3 @@ func (c *LoanApplicationController) PayInstallment(w http.ResponseWriter, r *htt
 
 	web.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Nearest due installment paid successfully"})
 }
-

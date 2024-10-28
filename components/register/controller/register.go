@@ -8,6 +8,7 @@ import (
 	"loanApp/components/customer/service"
 	"loanApp/models/user"
 	"loanApp/utils/log"
+	"loanApp/utils/validation"
 	"loanApp/utils/web"
 
 	"github.com/gorilla/mux"
@@ -42,6 +43,11 @@ func (rc *RegisterController) RegisterCustomer(w http.ResponseWriter, r *http.Re
 
 	if err := validateCustomer(newCustomer); err != nil {
 		rc.log.Error("Validation error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validation.ValidateEmail(newCustomer.Email); err != nil {
+		rc.log.Error("Email Validation error: ", err)
 		web.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}

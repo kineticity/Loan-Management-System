@@ -9,6 +9,7 @@ import (
 	"loanApp/components/middleware"
 	"loanApp/models/user"
 	"loanApp/utils/log"
+	"loanApp/utils/validation"
 	"loanApp/utils/web"
 
 	"github.com/gorilla/mux"
@@ -39,8 +40,14 @@ func (c *LoanOfficerController) RegisterRoutes(router *mux.Router) {
 	decisionRouter := router.PathPrefix("/loan-officer/decision").Subrouter()
 	decisionRouter.Use(middleware.TokenAuthMiddleware)
 	decisionRouter.Use(middleware.LoanOfficerOnly)
+	// Route to get all loan applications assigned to the loan officer
 	decisionRouter.HandleFunc("/applications", c.GetAssignedLoanApplications).Methods(http.MethodGet)
-	decisionRouter.HandleFunc("/applications/{id}", c.ApproveOrRejectApplication).Methods(http.MethodPost)
+
+	// Route to approve or reject the initial loan application (first step approval)
+	decisionRouter.HandleFunc("/applications/{id}/initial-approval", c.ApproveInitialApplication).Methods(http.MethodPost)
+
+	// Route to approve or reject collateral documents for the loan application (second step approval)
+	decisionRouter.HandleFunc("/applications/{id}/collateral-approval", c.ApproveCollateralDocuments).Methods(http.MethodPost)
 }
 
 func (c *LoanOfficerController) CreateLoanOfficer(w http.ResponseWriter, r *http.Request) {
@@ -66,6 +73,11 @@ func (c *LoanOfficerController) CreateLoanOfficer(w http.ResponseWriter, r *http
 	if admin == nil {
 		c.log.Error("No such admin found: ", err)
 		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
+		return
+	}
+	if err := validation.ValidateEmail(newOfficer.Email); err != nil {
+		c.log.Error("Email Validation error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -125,6 +137,11 @@ func (c *LoanOfficerController) UpdateLoanOfficer(w http.ResponseWriter, r *http
 	} else {
 		updatedOfficer.UpdatedBy = append(updatedOfficer.UpdatedBy, admin)
 	}
+	if err := validation.ValidateEmail(updatedOfficer.Email); err != nil {
+		c.log.Error("Email Validation error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 
 	if err := c.LoanOfficerService.UpdateLoanOfficer(officerID, &updatedOfficer); err != nil {
 		c.log.Error("Error updating loan officer: ", err)
@@ -165,28 +182,16 @@ func (c *LoanOfficerController) GetAssignedLoanApplications(w http.ResponseWrite
 
 	web.RespondWithJSON(w, http.StatusOK, applications)
 }
-func (c *LoanOfficerController) ApproveOrRejectApplication(w http.ResponseWriter, r *http.Request) {
+
+// ApproveInitialApplication handles the first approval of the loan application
+func (c *LoanOfficerController) ApproveInitialApplication(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	applicationID := vars["id"]
 
-	// Get the user ID of the loan officer from the request context
 	userID, err := web.GetUserIDFromContext(r)
 	if err != nil {
 		c.log.Error("User ID not found in context:", err)
 		web.RespondWithError(w, http.StatusUnauthorized, "Unauthorized access")
-		return
-	}
-
-	// Check if the application is assigned to the loan officer
-	isAssigned, err := c.LoanOfficerService.IsApplicationAssignedToOfficer(applicationID, userID)
-	if err != nil {
-		c.log.Error("Error checking application assignment:", err)
-		web.RespondWithError(w, http.StatusInternalServerError, "Could not verify application assignment")
-		return
-	}
-	if !isAssigned {
-		c.log.Error("Unauthorized access: Application not assigned to this officer")
-		web.RespondWithError(w, http.StatusForbidden, "You are not authorized to make this decision")
 		return
 	}
 
@@ -199,12 +204,43 @@ func (c *LoanOfficerController) ApproveOrRejectApplication(w http.ResponseWriter
 		return
 	}
 
-	err = c.LoanOfficerService.ProcessApplicationDecision(applicationID, decision.Approve)
+	err = c.LoanOfficerService.ApproveInitialApplication(applicationID, userID, decision.Approve)
 	if err != nil {
-		c.log.Error("Error processing loan application decision:", err)
-		web.RespondWithError(w, http.StatusInternalServerError, "Error processing application decision")
+		c.log.Error("Error approving application:", err)
+		web.RespondWithError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	web.RespondWithJSON(w, http.StatusOK, "Application processed successfully")
+	web.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Application processed successfully"})
+}
+
+// ApproveCollateralDocuments handles approval of collateral documents for the application
+func (c *LoanOfficerController) ApproveCollateralDocuments(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	applicationID := vars["id"]
+
+	userID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("User ID not found in context:", err)
+		web.RespondWithError(w, http.StatusUnauthorized, "Unauthorized access")
+		return
+	}
+
+	var decision struct {
+		Approve bool `json:"approve"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&decision); err != nil {
+		c.log.Error("Invalid input:", err)
+		web.RespondWithError(w, http.StatusBadRequest, "Invalid input")
+		return
+	}
+
+	err = c.LoanOfficerService.ApproveCollateralDocuments(applicationID, userID, decision.Approve)
+	if err != nil {
+		c.log.Error("Error approving collateral:", err)
+		web.RespondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	web.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Collateral processed successfully"})
 }

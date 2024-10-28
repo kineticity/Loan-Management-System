@@ -6,6 +6,7 @@ import (
 	"loanApp/components/admin/service"
 
 	loanappservice "loanApp/components/loanapplication/service"
+	loanofficerService "loanApp/components/loanofficer/service"
 	"loanApp/models/logininfo"
 	"loanApp/models/user"
 	"loanApp/modules"
@@ -46,11 +47,13 @@ func main() {
 	createSuperAdmin(adminService)
 
 	// Create a new LoanApplicationService instance
-	loanApplicationService := loanappservice.NewLoanApplicationService(db, repository, logger)
+	loanOfficerService := loanofficerService.NewLoanOfficerService(db, repository, logger)
+	loanApplicationService := loanappservice.NewLoanApplicationService(db, repository, logger, loanOfficerService)
 
 	// Start the NPA status check scheduler
 	loanappservice.ScheduleNPAStatusCheck(loanApplicationService)
 	loanappservice.StartReminderScheduler(loanApplicationService)
+	loanofficerService.SchedulePendingCollateralCheck(loanOfficerService)
 
 	// Start server in a goroutine
 	wg.Add(1) // Increment the WaitGroup counter

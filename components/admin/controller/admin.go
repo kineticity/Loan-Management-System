@@ -10,6 +10,7 @@ import (
 	"loanApp/components/middleware"
 	"loanApp/models/user"
 	"loanApp/utils/log"
+	"loanApp/utils/validation"
 	"loanApp/utils/web"
 
 	"github.com/gorilla/mux"
@@ -48,6 +49,11 @@ func (a *AdminController) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 
 	if err := validateAdmin(newAdmin); err != nil {
 		a.log.Error("Validation error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if err := validation.ValidateEmail(newAdmin.Email); err != nil {
+		a.log.Error("Email Validation error: ", err)
 		web.RespondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
