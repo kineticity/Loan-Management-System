@@ -9,7 +9,7 @@ import (
 	"loanApp/components/loanscheme/service"
 	"loanApp/components/middleware"
 	"loanApp/models/loanscheme"
-	"loanApp/models/user"
+	// "loanApp/models/user"
 	"loanApp/utils/log"
 	"loanApp/utils/web"
 
@@ -59,23 +59,24 @@ func (c *LoanSchemeController) CreateLoanScheme(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var admin *user.Admin
-	for _, a := range app.AllAdmins {
-		if a.ID == userID {
-			admin = a
-			break
-		}
-	}
-	if admin == nil {
-		c.log.Error("Admin user not found")
-		web.RespondWithError(w, http.StatusForbidden, "Admin privileges required")
-		return
-	}
+	// var admin *user.Admin
+	// for _, a := range app.AllAdmins {
+	// 	if a.ID == userID {
+	// 		admin = a
+	// 		break
+	// 	}
+	// }
+	// if admin == nil {
+	// 	c.log.Error("Admin user not found")
+	// 	web.RespondWithError(w, http.StatusForbidden, "Admin privileges required")
+	// 	return
+	// }
 
-	newScheme.CreatedBy = admin
-	newScheme.AdminID = admin.ID
 
-	if err := c.LoanSchemeService.CreateLoanScheme(&newScheme); err != nil {
+	// newScheme.CreatedBy = admin
+	newScheme.AdminID = userID
+
+	if err := c.LoanSchemeService.CreateLoanScheme(&newScheme,newScheme.AdminID); err != nil {
 		c.log.Error("Error creating loan scheme: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not create loan scheme")
 		return
@@ -87,12 +88,21 @@ func (c *LoanSchemeController) CreateLoanScheme(w http.ResponseWriter, r *http.R
 }
 
 func (c *LoanSchemeController) GetAllLoanSchemes(w http.ResponseWriter, r *http.Request) {
+
+	userID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("No such admin found: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
+		return
+	}
 	var allSchemes []*loanscheme.LoanScheme
 	totalCount := 0
 
 	parser := web.NewParser(r)
 
-	if err := c.LoanSchemeService.GetAllLoanSchemes(&allSchemes, &totalCount, *parser); err != nil {
+
+
+	if err := c.LoanSchemeService.GetAllLoanSchemes(&allSchemes, &totalCount, *parser, userID); err != nil {
 		c.log.Error("Error fetching loan schemes: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not fetch loan schemes")
 		return
@@ -119,18 +129,18 @@ func (c *LoanSchemeController) UpdateLoanScheme(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	var admin *user.Admin
-	for _, a := range app.AllAdmins {
-		if a.ID == userID {
-			admin = a
-			break
-		}
-	}
-	if admin == nil {
-		c.log.Error("Admin user not found")
-		web.RespondWithError(w, http.StatusForbidden, "Admin privileges required")
-		return
-	}
+	// var admin *user.Admin
+	// for _, a := range app.AllAdmins {
+	// 	if a.ID == userID {
+	// 		admin = a
+	// 		break
+	// 	}
+	// }
+	// if admin == nil {
+	// 	c.log.Error("Admin user not found")
+	// 	web.RespondWithError(w, http.StatusForbidden, "Admin privileges required")
+	// 	return
+	// }
 
 	if err := validateLoanScheme(&updatedScheme); err != nil {
 		c.log.Error("Invalid input values: ", err)
@@ -138,9 +148,9 @@ func (c *LoanSchemeController) UpdateLoanScheme(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	updatedScheme.UpdatedBy = append(updatedScheme.UpdatedBy, admin)
+	// updatedScheme.UpdatedBy = append(updatedScheme.UpdatedBy, admin)
 
-	if err := c.LoanSchemeService.UpdateLoanScheme(schemeID, &updatedScheme); err != nil {
+	if err := c.LoanSchemeService.UpdateLoanScheme(schemeID, &updatedScheme,userID); err != nil {
 		c.log.Error("Error updating loan scheme: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not update loan scheme")
 		return
@@ -153,7 +163,14 @@ func (c *LoanSchemeController) DeleteLoanScheme(w http.ResponseWriter, r *http.R
 	vars := mux.Vars(r)
 	schemeID := vars["id"]
 
-	if err := c.LoanSchemeService.DeleteLoanScheme(schemeID); err != nil {
+	userID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("No such admin found: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
+		return
+	}
+
+	if err := c.LoanSchemeService.DeleteLoanScheme(schemeID,userID); err != nil {
 		c.log.Error("Error deleting loan scheme: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not delete loan scheme")
 		return

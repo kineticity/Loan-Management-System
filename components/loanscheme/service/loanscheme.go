@@ -2,7 +2,9 @@ package service
 
 import (
 	"fmt"
+	"loanApp/models/loanapplication"
 	"loanApp/models/loanscheme"
+	"loanApp/models/user"
 	"loanApp/repository"
 	"loanApp/utils/log"
 	"loanApp/utils/web"
@@ -25,22 +27,81 @@ func NewLoanSchemeService(db *gorm.DB, repository repository.Repository, log log
 	}
 }
 
-func (s *LoanSchemeService) CreateLoanScheme(scheme *loanscheme.LoanScheme) error {
+// func (s *LoanSchemeService) CreateLoanScheme(scheme *loanscheme.LoanScheme) error {
+// 	uow := repository.NewUnitOfWork(s.DB)
+// 	defer uow.RollBack()
+
+
+
+// 	err := s.repository.Add(uow, scheme)
+// 	if err != nil {
+// 		return err
+// 	}
+
+// 	uow.Commit()
+// 	return nil
+// }
+func (s *LoanSchemeService) CreateLoanScheme(scheme *loanscheme.LoanScheme, userID uint) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	err := s.repository.Add(uow, scheme)
+	isAdmin, err := s.checkAdminPrivileges(uow, userID)
 	if err != nil {
 		return err
+	}
+	if !isAdmin {
+		return fmt.Errorf("admin privileges required")
+	}
+
+	var admin user.Admin
+	err=s.repository.GetByID(uow,&admin,userID)
+	if err!=nil{
+		return err
+	}
+	scheme.CreatedBy=&admin
+
+	var existingScheme loanscheme.LoanScheme
+	err = s.repository.GetAll(uow, &existingScheme, s.repository.Filter("name = ?", scheme.Name))
+	if err != nil && !gorm.IsRecordNotFoundError(err) { 
+		return fmt.Errorf("error checking for duplicate loan scheme: %v", err)
+	}
+	if existingScheme.Name != "" {
+		return fmt.Errorf("a loan scheme with this name already exists")
+	}
+
+	err = s.repository.Add(uow, scheme)
+	if err != nil {
+		return fmt.Errorf("could not create loan scheme: %v", err)
 	}
 
 	uow.Commit()
 	return nil
 }
 
-func (s *LoanSchemeService) GetAllLoanSchemes(allSchemes *[]*loanscheme.LoanScheme, totalCount *int, parser web.Parser) error {
+func (s *LoanSchemeService) checkAdminPrivileges(uow *repository.UOW, userID uint) (bool, error) {
+	var admin user.User
+	err := s.repository.GetByID(uow, &admin, userID)
+	if err != nil {
+		return false, fmt.Errorf("admin user not found")
+	}
+
+	if admin.Role != "Admin" {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (s *LoanSchemeService) GetAllLoanSchemes(allSchemes *[]*loanscheme.LoanScheme, totalCount *int, parser web.Parser, userID uint ) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
+
+	isAdmin, err := s.checkAdminPrivileges(uow, userID)
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return fmt.Errorf("admin privileges required")
+	}
 
 	limit, err := strconv.Atoi(parser.Form.Get("limit"))
 	if err != nil {
@@ -65,20 +126,28 @@ func (s *LoanSchemeService) GetAllLoanSchemes(allSchemes *[]*loanscheme.LoanSche
 	return nil
 }
 
-func (s *LoanSchemeService) UpdateLoanScheme(id string, updatedScheme *loanscheme.LoanScheme) error {
+func (s *LoanSchemeService) UpdateLoanScheme(id string, updatedScheme *loanscheme.LoanScheme, userID uint) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
+
+	isAdmin, err := s.checkAdminPrivileges(uow, userID)
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return fmt.Errorf("admin privileges required")
+	}
 
 	var scheme loanscheme.LoanScheme
 	if err := s.repository.GetByID(uow, &scheme, id); err != nil {
 		return err
 	}
 
-	var applications []loanscheme.LoanScheme
-	err := s.repository.GetAll(uow, &applications,
+	var applications []loanapplication.LoanApplication
+	err = s.repository.GetAll(uow, &applications,
 		s.repository.Filter("loan_scheme_id = ?", id),
 		s.repository.Filter("status IN (?, ?, ?, ?)", "Pending", "PendingCollateral", "Collateral Uploaded", "Approved"))
-	if err != nil {
+	if err != nil  {
 		return fmt.Errorf("failed to fetch loan applications: %w", err)
 	}
 
@@ -100,17 +169,25 @@ func (s *LoanSchemeService) UpdateLoanScheme(id string, updatedScheme *loanschem
 	return nil
 }
 
-func (s *LoanSchemeService) DeleteLoanScheme(id string) error {
+func (s *LoanSchemeService) DeleteLoanScheme(id string, userID uint) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
+
+	isAdmin, err := s.checkAdminPrivileges(uow, userID)
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return fmt.Errorf("admin privileges required")
+	}
 
 	var scheme loanscheme.LoanScheme
 	if err := s.repository.GetByID(uow, &scheme, id); err != nil {
 		return err
 	}
 
-	var applications []loanscheme.LoanScheme
-	err := s.repository.GetAll(uow, &applications,
+	var applications []loanapplication.LoanApplication
+	err = s.repository.GetAll(uow, &applications,
 		s.repository.Filter("loan_scheme_id = ?", id),
 		s.repository.Filter("status IN (?, ?, ?, ?)", "Pending", "PendingCollateral", "Collateral Uploaded", "Approved"))
 	if err != nil {
@@ -128,5 +205,3 @@ func (s *LoanSchemeService) DeleteLoanScheme(id string) error {
 	uow.Commit()
 	return nil
 }
-
-

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"loanApp/app"
 	"loanApp/components/loanofficer/service"
 	"loanApp/components/middleware"
 	"loanApp/models/user"
@@ -60,18 +59,18 @@ func (c *LoanOfficerController) CreateLoanOfficer(w http.ResponseWriter, r *http
 		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
 		return
 	}
-	var admin *user.Admin
-	for _, a := range app.AllAdmins {
-		if a.ID == userID {
-			admin = a
-		}
-	}
+	// var admin *user.Admin
+	// for _, a := range app.AllAdmins {
+	// 	if a.ID == userID {
+	// 		admin = a
+	// 	}
+	// }
 
-	if admin == nil {
-		c.log.Error("No such admin found: ", err)
-		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
-		return
-	}
+	// if admin == nil {
+	// 	c.log.Error("No such admin found: ", err)
+	// 	web.RespondWithError(w, http.StatusBadRequest, "No admin found")
+	// 	return
+	// }
 	if err := validation.ValidateEmail(newOfficer.Email); err != nil {
 		c.log.Error("Email Validation error: ", err)
 		web.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -86,9 +85,9 @@ func (c *LoanOfficerController) CreateLoanOfficer(w http.ResponseWriter, r *http
 	}
 	newOfficer.Password = hashedPassword
 
-	newOfficer.CreatedByAdminID = admin.ID
+	newOfficer.CreatedByAdminID = userID //
 	newOfficer.Role = "Loan Officer"
-	if err := c.LoanOfficerService.CreateLoanOfficer(&newOfficer); err != nil {
+	if err := c.LoanOfficerService.CreateLoanOfficer(&newOfficer, newOfficer.CreatedByAdminID); err != nil {
 		c.log.Error("Error creating loan officer: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not create loan officer")
 		return
@@ -101,11 +100,18 @@ func (c *LoanOfficerController) CreateLoanOfficer(w http.ResponseWriter, r *http
 func (c *LoanOfficerController) GetAllLoanOfficers(w http.ResponseWriter, r *http.Request) {
 	c.log.Info("GetAllLoanOfficers called")
 
+	userID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("No such admin found: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
+		return
+	}
+
 	parser := web.NewParser(r)
 	allLoanOfficers := []*user.LoanOfficer{}
 	var totalCount int
 
-	if err := c.LoanOfficerService.GetAllLoanOfficers(&allLoanOfficers, &totalCount, *parser); err != nil {
+	if err := c.LoanOfficerService.GetAllLoanOfficers(&allLoanOfficers, &totalCount, *parser, userID); err != nil {
 		c.log.Error("Error fetching officers: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not fetch officers")
 		return
@@ -131,17 +137,17 @@ func (c *LoanOfficerController) UpdateLoanOfficer(w http.ResponseWriter, r *http
 		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
 		return
 	}
-	var admin *user.Admin
-	for _, a := range app.AllAdmins {
-		if a.ID == userID {
-			admin = a
-		}
-	}
-	if len(updatedOfficer.UpdatedBy) == 0 {
-		updatedOfficer.UpdatedBy = []*user.Admin{admin}
-	} else {
-		updatedOfficer.UpdatedBy = append(updatedOfficer.UpdatedBy, admin)
-	}
+	// var admin *user.Admin
+	// for _, a := range app.AllAdmins {
+	// 	if a.ID == userID {
+	// 		admin = a
+	// 	}
+	// }
+	// if len(updatedOfficer.UpdatedBy) == 0 {
+	// 	updatedOfficer.UpdatedBy = []*user.Admin{admin}
+	// } else {
+	// 	updatedOfficer.UpdatedBy = append(updatedOfficer.UpdatedBy, admin)
+	// }
 	if err := validation.ValidateEmail(updatedOfficer.Email); err != nil {
 		c.log.Error("Email Validation error: ", err)
 		web.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -156,7 +162,7 @@ func (c *LoanOfficerController) UpdateLoanOfficer(w http.ResponseWriter, r *http
 	}
 	updatedOfficer.Password = hashedPassword
 
-	if err := c.LoanOfficerService.UpdateLoanOfficer(officerID, &updatedOfficer); err != nil {
+	if err := c.LoanOfficerService.UpdateLoanOfficer(officerID, &updatedOfficer, userID); err != nil {
 		c.log.Error("Error updating loan officer: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not update loan officer")
 		return
@@ -169,7 +175,14 @@ func (c *LoanOfficerController) DeleteLoanOfficer(w http.ResponseWriter, r *http
 	vars := mux.Vars(r)
 	officerID := vars["id"]
 
-	if err := c.LoanOfficerService.DeleteLoanOfficer(officerID); err != nil {
+	userID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("No such admin found: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
+		return
+	}
+
+	if err := c.LoanOfficerService.DeleteLoanOfficer(officerID, userID); err != nil {
 		c.log.Error("Error deleting loan officer: ", err)
 		web.RespondWithError(w, http.StatusInternalServerError, "Could not delete loan officer")
 		return
