@@ -74,13 +74,16 @@ func (s *LoanSchemeService) UpdateLoanScheme(id string, updatedScheme *loanschem
 		return err
 	}
 
-	var applicationCount int
-	if err := s.repository.GetAll(uow, &applicationCount, s.repository.Filter("loan_scheme_id = ?", id), s.repository.Count(0, 0, &applicationCount)); err != nil {
-		return err
+	var applications []loanscheme.LoanScheme
+	err := s.repository.GetAll(uow, &applications,
+		s.repository.Filter("loan_scheme_id = ?", id),
+		s.repository.Filter("status IN (?, ?, ?, ?)", "Pending", "PendingCollateral", "Collateral Uploaded", "Approved"))
+	if err != nil {
+		return fmt.Errorf("failed to fetch loan applications: %w", err)
 	}
 
-	if applicationCount > 0 {
-		return fmt.Errorf("cannot update loan scheme with active applications")
+	if len(applications) > 0 {
+		return fmt.Errorf("cannot update loan scheme with ID %s: there are pending applications", id)
 	}
 
 	scheme.Name = updatedScheme.Name
@@ -106,13 +109,16 @@ func (s *LoanSchemeService) DeleteLoanScheme(id string) error {
 		return err
 	}
 
-	var applicationCount int
-	if err := s.repository.GetAll(uow, &applicationCount, s.repository.Filter("loan_scheme_id = ?", id), s.repository.Count(0, 0, &applicationCount)); err != nil {
-		return err
+	var applications []loanscheme.LoanScheme
+	err := s.repository.GetAll(uow, &applications,
+		s.repository.Filter("loan_scheme_id = ?", id),
+		s.repository.Filter("status IN (?, ?, ?, ?)", "Pending", "PendingCollateral", "Collateral Uploaded", "Approved"))
+	if err != nil {
+		return fmt.Errorf("failed to fetch loan applications: %w", err)
 	}
 
-	if applicationCount > 0 {
-		return fmt.Errorf("cannot delete loan scheme with active applications")
+	if len(applications) > 0 {
+		return fmt.Errorf("cannot delete loan scheme with ID %s: there are pending applications", id)
 	}
 
 	if err := s.repository.DeleteByID(uow, &scheme, id); err != nil {
