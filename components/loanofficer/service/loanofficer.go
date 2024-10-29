@@ -3,7 +3,6 @@ package service
 import (
 	"errors"
 	"fmt"
-	"loanApp/app"
 	"loanApp/models/installation"
 	"loanApp/models/loanapplication"
 	"loanApp/models/loanscheme"
@@ -33,50 +32,14 @@ func NewLoanOfficerService(db *gorm.DB, repository repository.Repository, log lo
 	}
 }
 
-// func (s *LoanOfficerService) CreateLoanOfficer(officer *user.LoanOfficer) error {
-// 	uow := repository.NewUnitOfWork(s.DB)
-// 	defer uow.RollBack()
-
-// 	if err := validateLoanOfficer(officer); err != nil {
-// 		return err
-// 	}
-
-// 	err := s.repository.Add(uow, &officer.User)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	officer.ID = officer.User.ID
-
-// 	err = s.repository.Add(uow, officer)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	uow.Commit()
-
-// 	app.AllLoanOfficers = append(app.AllLoanOfficers, officer)
-// 	return nil
-// }
 
 func (s *LoanOfficerService) CreateLoanOfficer(officer *user.LoanOfficer, adminID uint) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	isAdmin, err := s.checkAdminPrivileges(uow, adminID)
-	if err != nil {
-		return fmt.Errorf("error checking admin privileges: %v", err)
-	}
-	if !isAdmin {
-		return fmt.Errorf("admin privileges required to create a loan officer")
-	}
 
 
-	if err := validateLoanOfficer(officer); err != nil {
-		return err
-	}
-
-	err = s.repository.Add(uow, &officer.User)
+	err := s.repository.Add(uow, &officer.User)
 	if err != nil {
 		return fmt.Errorf("error creating user data for loan officer: %v", err)
 	}
@@ -90,32 +53,13 @@ func (s *LoanOfficerService) CreateLoanOfficer(officer *user.LoanOfficer, adminI
 
 	uow.Commit()
 
-	app.AllLoanOfficers = append(app.AllLoanOfficers, officer)
 	return nil
-}
-
-func (s *LoanOfficerService) checkAdminPrivileges(uow *repository.UOW, userID uint) (bool, error) {
-	var admin user.User
-	err := s.repository.GetByID(uow, &admin, userID)
-	if err != nil {
-		return false, fmt.Errorf("admin user not found")
-	}
-
-	return admin.Role == "Admin", nil
 }
 
 
 func (s *LoanOfficerService) GetAllLoanOfficers(allOfficers *[]*user.LoanOfficer, totalCount *int, parser web.Parser, adminID uint) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
-
-	isAdmin, err := s.checkAdminPrivileges(uow, adminID)
-	if err != nil {
-		return fmt.Errorf("error checking admin privileges: %v", err)
-	}
-	if !isAdmin {
-		return fmt.Errorf("admin privileges required to create a loan officer")
-	}
 
 	limit, err := strconv.Atoi(parser.Form.Get("limit"))
 	if err != nil {
@@ -146,14 +90,6 @@ func (s *LoanOfficerService) UpdateLoanOfficer(id string, updatedOfficer *user.L
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	isAdmin, err := s.checkAdminPrivileges(uow, adminID)
-	if err != nil {
-		return fmt.Errorf("error checking admin privileges: %v", err)
-	}
-	if !isAdmin {
-		return fmt.Errorf("admin privileges required to create a loan officer")
-	}
-
 	var officer user.LoanOfficer
 	if err := s.repository.GetByID(uow, &officer, id); err != nil {
 		return err
@@ -178,14 +114,6 @@ func (s *LoanOfficerService) DeleteLoanOfficer(id string, adminID uint) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	isAdmin, err := s.checkAdminPrivileges(uow, adminID)
-	if err != nil {
-		return fmt.Errorf("error checking admin privileges: %v", err)
-	}
-	if !isAdmin {
-		return fmt.Errorf("admin privileges required to create a loan officer")
-	}
-
 
 	var officer user.LoanOfficer
 	if err := s.repository.GetByID(uow, &officer, id); err != nil {
@@ -193,7 +121,7 @@ func (s *LoanOfficerService) DeleteLoanOfficer(id string, adminID uint) error {
 	}
 
 	var applications []loanapplication.LoanApplication
-	err = s.repository.GetAll(uow, &applications,
+	err := s.repository.GetAll(uow, &applications,
 		s.repository.Filter("loan_officer_id = ?", officer.ID),
 		s.repository.Filter("status IN (?, ?, ?)", "Pending", "PendingCollateral", "Collateral Uploaded"))
 	if err != nil {
@@ -221,18 +149,7 @@ func (s *LoanOfficerService) DeleteLoanOfficer(id string, adminID uint) error {
 	return nil
 }
 
-func validateLoanOfficer(loanOfficer *user.LoanOfficer) error {
-	if loanOfficer.Name == "" {
-		return errors.New("name cannot be empty")
-	}
-	if loanOfficer.Email == "" {
-		return errors.New("email cannot be empty")
-	}
-	if loanOfficer.Password == "" {
-		return errors.New("password cannot be empty")
-	}
-	return nil
-}
+
 
 func (s *LoanOfficerService) GetLeastLoadedOfficer() (*user.LoanOfficer, error) {
 	var officer user.LoanOfficer

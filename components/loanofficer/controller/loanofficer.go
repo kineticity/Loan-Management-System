@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"loanApp/components/loanofficer/service"
@@ -59,18 +60,13 @@ func (c *LoanOfficerController) CreateLoanOfficer(w http.ResponseWriter, r *http
 		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
 		return
 	}
-	// var admin *user.Admin
-	// for _, a := range app.AllAdmins {
-	// 	if a.ID == userID {
-	// 		admin = a
-	// 	}
-	// }
 
-	// if admin == nil {
-	// 	c.log.Error("No such admin found: ", err)
-	// 	web.RespondWithError(w, http.StatusBadRequest, "No admin found")
-	// 	return
-	// }
+	if err:=validateLoanOfficer(&newOfficer); err != nil {
+		c.log.Error("Input Validation error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	
 	if err := validation.ValidateEmail(newOfficer.Email); err != nil {
 		c.log.Error("Email Validation error: ", err)
 		web.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -137,17 +133,12 @@ func (c *LoanOfficerController) UpdateLoanOfficer(w http.ResponseWriter, r *http
 		web.RespondWithError(w, http.StatusBadRequest, "No admin found")
 		return
 	}
-	// var admin *user.Admin
-	// for _, a := range app.AllAdmins {
-	// 	if a.ID == userID {
-	// 		admin = a
-	// 	}
-	// }
-	// if len(updatedOfficer.UpdatedBy) == 0 {
-	// 	updatedOfficer.UpdatedBy = []*user.Admin{admin}
-	// } else {
-	// 	updatedOfficer.UpdatedBy = append(updatedOfficer.UpdatedBy, admin)
-	// }
+
+	if err:=validateLoanOfficer(&updatedOfficer); err != nil {
+		c.log.Error("Input Validation error: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err := validation.ValidateEmail(updatedOfficer.Email); err != nil {
 		c.log.Error("Email Validation error: ", err)
 		web.RespondWithError(w, http.StatusBadRequest, err.Error())
@@ -267,4 +258,17 @@ func (c *LoanOfficerController) ApproveCollateralDocuments(w http.ResponseWriter
 	}
 
 	web.RespondWithJSON(w, http.StatusOK, map[string]string{"message": "Collateral processed successfully"})
+}
+
+func validateLoanOfficer(loanOfficer *user.LoanOfficer) error {
+	if loanOfficer.Name == "" {
+		return errors.New("name cannot be empty")
+	}
+	if loanOfficer.Email == "" {
+		return errors.New("email cannot be empty")
+	}
+	if loanOfficer.Password == "" {
+		return errors.New("password cannot be empty")
+	}
+	return nil
 }

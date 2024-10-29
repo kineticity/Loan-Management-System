@@ -27,34 +27,14 @@ func NewLoanSchemeService(db *gorm.DB, repository repository.Repository, log log
 	}
 }
 
-// func (s *LoanSchemeService) CreateLoanScheme(scheme *loanscheme.LoanScheme) error {
-// 	uow := repository.NewUnitOfWork(s.DB)
-// 	defer uow.RollBack()
-
-
-
-// 	err := s.repository.Add(uow, scheme)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	uow.Commit()
-// 	return nil
-// }
 func (s *LoanSchemeService) CreateLoanScheme(scheme *loanscheme.LoanScheme, userID uint) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	isAdmin, err := s.checkAdminPrivileges(uow, userID)
-	if err != nil {
-		return err
-	}
-	if !isAdmin {
-		return fmt.Errorf("admin privileges required")
-	}
+
 
 	var admin user.Admin
-	err=s.repository.GetByID(uow,&admin,userID)
+	err:=s.repository.GetByID(uow,&admin,userID)
 	if err!=nil{
 		return err
 	}
@@ -78,30 +58,10 @@ func (s *LoanSchemeService) CreateLoanScheme(scheme *loanscheme.LoanScheme, user
 	return nil
 }
 
-func (s *LoanSchemeService) checkAdminPrivileges(uow *repository.UOW, userID uint) (bool, error) {
-	var admin user.User
-	err := s.repository.GetByID(uow, &admin, userID)
-	if err != nil {
-		return false, fmt.Errorf("admin user not found")
-	}
-
-	if admin.Role != "Admin" {
-		return false, nil
-	}
-	return true, nil
-}
 
 func (s *LoanSchemeService) GetAllLoanSchemes(allSchemes *[]*loanscheme.LoanScheme, totalCount *int, parser web.Parser, userID uint ) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
-
-	isAdmin, err := s.checkAdminPrivileges(uow, userID)
-	if err != nil {
-		return err
-	}
-	if !isAdmin {
-		return fmt.Errorf("admin privileges required")
-	}
 
 	limit, err := strconv.Atoi(parser.Form.Get("limit"))
 	if err != nil {
@@ -130,13 +90,7 @@ func (s *LoanSchemeService) UpdateLoanScheme(id string, updatedScheme *loanschem
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	isAdmin, err := s.checkAdminPrivileges(uow, userID)
-	if err != nil {
-		return err
-	}
-	if !isAdmin {
-		return fmt.Errorf("admin privileges required")
-	}
+
 
 	var scheme loanscheme.LoanScheme
 	if err := s.repository.GetByID(uow, &scheme, id); err != nil {
@@ -144,7 +98,7 @@ func (s *LoanSchemeService) UpdateLoanScheme(id string, updatedScheme *loanschem
 	}
 
 	var applications []loanapplication.LoanApplication
-	err = s.repository.GetAll(uow, &applications,
+	err := s.repository.GetAll(uow, &applications,
 		s.repository.Filter("loan_scheme_id = ?", id),
 		s.repository.Filter("status IN (?, ?, ?, ?)", "Pending", "PendingCollateral", "Collateral Uploaded", "Approved"))
 	if err != nil  {
@@ -159,7 +113,6 @@ func (s *LoanSchemeService) UpdateLoanScheme(id string, updatedScheme *loanschem
 	scheme.Category = updatedScheme.Category
 	scheme.InterestRate = updatedScheme.InterestRate
 	scheme.Tenure = updatedScheme.Tenure
-	scheme.UpdatedBy = updatedScheme.UpdatedBy
 
 	if err := s.repository.Update(uow, &scheme); err != nil {
 		return err
@@ -173,21 +126,13 @@ func (s *LoanSchemeService) DeleteLoanScheme(id string, userID uint) error {
 	uow := repository.NewUnitOfWork(s.DB)
 	defer uow.RollBack()
 
-	isAdmin, err := s.checkAdminPrivileges(uow, userID)
-	if err != nil {
-		return err
-	}
-	if !isAdmin {
-		return fmt.Errorf("admin privileges required")
-	}
-
 	var scheme loanscheme.LoanScheme
 	if err := s.repository.GetByID(uow, &scheme, id); err != nil {
 		return err
 	}
 
 	var applications []loanapplication.LoanApplication
-	err = s.repository.GetAll(uow, &applications,
+	err := s.repository.GetAll(uow, &applications,
 		s.repository.Filter("loan_scheme_id = ?", id),
 		s.repository.Filter("status IN (?, ?, ?, ?)", "Pending", "PendingCollateral", "Collateral Uploaded", "Approved"))
 	if err != nil {

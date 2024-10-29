@@ -1,7 +1,7 @@
 package service
 
 import (
-	"loanApp/app"
+	// "loanApp/app"
 	"loanApp/models/statistics"
 	"loanApp/models/user"
 	"loanApp/repository"
@@ -33,6 +33,8 @@ func (u *AdminService) CreateAdmin(newAdmin *user.Admin) error {
 	uow := repository.NewUnitOfWork(u.DB)
 	defer uow.RollBack()
 
+	
+
 	err := u.repository.Add(uow, &newAdmin.User)
 	if err != nil {
 		return err
@@ -45,9 +47,11 @@ func (u *AdminService) CreateAdmin(newAdmin *user.Admin) error {
 	}
 
 	uow.Commit()
-	app.AllAdmins = append(app.AllAdmins, newAdmin)
+	// app.AllAdmins = append(app.AllAdmins, newAdmin)
 	return nil
 }
+
+
 
 func (u *AdminService) GetAllAdmins(allAdmins *[]*user.Admin, totalCount *int, parser web.Parser) error {
 	uow := repository.NewUnitOfWork(u.DB)

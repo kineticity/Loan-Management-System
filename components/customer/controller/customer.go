@@ -5,7 +5,10 @@ import (
 	"net/http"
 
 	"loanApp/components/customer/service"
+	loanschemeservice "loanApp/components/loanscheme/service"
+
 	"loanApp/components/middleware"
+	"loanApp/models/loanscheme"
 	"loanApp/models/user"
 	"loanApp/utils/log"
 	"loanApp/utils/validation"
@@ -16,12 +19,14 @@ import (
 
 type CustomerController struct {
 	CustomerService *service.CustomerService
+	LoanSchemeService *loanschemeservice.LoanSchemeService
 	log             log.Logger
 }
 
-func NewCustomerController(customerService *service.CustomerService, log log.Logger) *CustomerController {
+func NewCustomerController(customerService *service.CustomerService, log log.Logger, loanschemeService *loanschemeservice.LoanSchemeService ) *CustomerController {
 	return &CustomerController{
 		CustomerService: customerService,
+		LoanSchemeService: loanschemeService,
 		log:             log,
 	}
 }
@@ -31,6 +36,9 @@ func (c *CustomerController) RegisterRoutes(router *mux.Router) {
 	customerRouter.Use(middleware.TokenAuthMiddleware)
 	customerRouter.Use(middleware.CustomerOnly)
 	customerRouter.HandleFunc("/update", c.UpdateCustomer).Methods(http.MethodPut)
+	customerRouter.HandleFunc("/schemes", c.GetAllLoanSchemes).Methods(http.MethodGet)
+
+
 }
 
 func (c *CustomerController) UpdateCustomer(w http.ResponseWriter, r *http.Request) {
@@ -87,4 +95,26 @@ func (c *CustomerController) UpdateCustomer(w http.ResponseWriter, r *http.Reque
 	}
 
 	web.RespondWithJSON(w, http.StatusOK, existingCustomer)
+}
+
+func (c *CustomerController) GetAllLoanSchemes(w http.ResponseWriter, r *http.Request) {
+
+	userID, err := web.GetUserIDFromContext(r)
+	if err != nil {
+		c.log.Error("No such customer found: ", err)
+		web.RespondWithError(w, http.StatusBadRequest, "No customer found")
+		return
+	}
+	var allSchemes []*loanscheme.LoanScheme
+	totalCount := 0
+
+	parser := web.NewParser(r)
+
+	if err := c.LoanSchemeService.GetAllLoanSchemes(&allSchemes, &totalCount, *parser, userID); err != nil {
+		c.log.Error("Error fetching loan schemes: ", err)
+		web.RespondWithError(w, http.StatusInternalServerError, "Could not fetch loan schemes")
+		return
+	}
+
+	web.RespondWithJSON(w, http.StatusOK, allSchemes)
 }

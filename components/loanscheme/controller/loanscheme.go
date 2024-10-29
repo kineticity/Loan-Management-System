@@ -5,7 +5,7 @@ import (
 	"errors"
 	"net/http"
 
-	"loanApp/app"
+	// "loanApp/app"
 	"loanApp/components/loanscheme/service"
 	"loanApp/components/middleware"
 	"loanApp/models/loanscheme"
@@ -82,7 +82,7 @@ func (c *LoanSchemeController) CreateLoanScheme(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	app.AllLoanSchemes = append(app.AllLoanSchemes, &newScheme)
+	// app.AllLoanSchemes = append(app.AllLoanSchemes, &newScheme)
 
 	web.RespondWithJSON(w, http.StatusCreated, newScheme)
 }

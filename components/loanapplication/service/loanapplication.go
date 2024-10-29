@@ -191,7 +191,7 @@ func (s *LoanApplicationService) saveDocument(fileHeader *multipart.FileHeader, 
 	}
 	defer file.Close()
 
-	fileName := fileHeader.Filename
+	fileName := fileHeader.Filename+strconv.Itoa(int(applicationID))
 	filePath := filepath.Join(DocumentUploadDir, docType, fileName)
 
 	dst, err := os.Create(filePath)

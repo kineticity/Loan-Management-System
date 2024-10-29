@@ -40,6 +40,7 @@ func (a *AdminController) RegisterRoutes(router *mux.Router) {
 func (a *AdminController) CreateAdmin(w http.ResponseWriter, r *http.Request) {
 	a.log.Info("CreateAdmin called")
 
+
 	var newAdmin user.Admin
 	if err := json.NewDecoder(r.Body).Decode(&newAdmin); err != nil {
 		a.log.Error("Invalid input: ", err)
