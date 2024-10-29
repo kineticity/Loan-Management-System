@@ -281,6 +281,8 @@ func (s *LoanApplicationService) PayInstallment(customerID, loanApplicationID ui
 	return nil
 }
 
+
+
 func (s *LoanApplicationService) CheckForNPA() error {
 	var applications []loanapplication.LoanApplication
 
@@ -298,7 +300,7 @@ func (s *LoanApplicationService) CheckForNPA() error {
 		err := s.repository.GetAll(uow, &installments,
 			s.repository.Filter("loan_application_id = ?", app.ID),
 			s.repository.Filter("status = ?", "Pending"),
-			s.repository.Filter("due_date < ?", now), 
+			s.repository.Filter("due_date < ?", now),
 			s.repository.OrderBy("due_date DESC"),
 			s.repository.Limit(3),
 		)
@@ -316,6 +318,11 @@ func (s *LoanApplicationService) CheckForNPA() error {
 
 		if overdueCount == 3 && !app.IsNPA {
 			app.IsNPA = true
+			if err := s.repository.Update(uow, &app); err != nil {
+				return fmt.Errorf("failed to update loan application NPA status: %w", err)
+			}
+		} else if overdueCount < 3 && app.IsNPA {
+			app.IsNPA = false
 			if err := s.repository.Update(uow, &app); err != nil {
 				return fmt.Errorf("failed to update loan application NPA status: %w", err)
 			}

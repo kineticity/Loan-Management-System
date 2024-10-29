@@ -1,6 +1,7 @@
 package service
 
 import (
+	"fmt"
 	"loanApp/models/loanscheme"
 	"loanApp/repository"
 	"loanApp/utils/log"
@@ -73,6 +74,15 @@ func (s *LoanSchemeService) UpdateLoanScheme(id string, updatedScheme *loanschem
 		return err
 	}
 
+	var applicationCount int
+	if err := s.repository.GetAll(uow, &applicationCount, s.repository.Filter("loan_scheme_id = ?", id), s.repository.Count(0, 0, &applicationCount)); err != nil {
+		return err
+	}
+
+	if applicationCount > 0 {
+		return fmt.Errorf("cannot update loan scheme with active applications")
+	}
+
 	scheme.Name = updatedScheme.Name
 	scheme.Category = updatedScheme.Category
 	scheme.InterestRate = updatedScheme.InterestRate
@@ -96,6 +106,15 @@ func (s *LoanSchemeService) DeleteLoanScheme(id string) error {
 		return err
 	}
 
+	var applicationCount int
+	if err := s.repository.GetAll(uow, &applicationCount, s.repository.Filter("loan_scheme_id = ?", id), s.repository.Count(0, 0, &applicationCount)); err != nil {
+		return err
+	}
+
+	if applicationCount > 0 {
+		return fmt.Errorf("cannot delete loan scheme with active applications")
+	}
+
 	if err := s.repository.DeleteByID(uow, &scheme, id); err != nil {
 		return err
 	}
@@ -103,3 +122,5 @@ func (s *LoanSchemeService) DeleteLoanScheme(id string) error {
 	uow.Commit()
 	return nil
 }
+
+
